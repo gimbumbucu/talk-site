@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="utf-8">
@@ -39,7 +39,6 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     h2 { font-size: 17px; margin: 0 0 8px 0; color: #0f172a; font-weight: 700; }
     p { font-size: 13px; color: #64748b; margin: 0; line-height: 1.5; }
-    .offline { display: none; color: #e11d48; }
   </style>
 </head>
 <body>
@@ -50,25 +49,50 @@
   </div>
 
   <script>
-    async function redirect() {
-      try {
-        const res = await fetch('https://kvdb.io/2DZmKeioXVnwvtF7hLgkaN/current_url?nocache=' + Date.now());
-        if (res.ok) {
-          const targetUrl = (await res.text()).trim();
-          if (targetUrl && targetUrl.startsWith('http')) {
-            window.location.replace(targetUrl);
-            return;
-          }
-        }
-      } catch (err) {
-        console.error(err);
+    // 1. 자동 로그인 계정 동기화 (iframe 모드)
+    if (window.location.hash.startsWith('#sync=')) {
+      const raw = window.location.hash.slice(6);
+      if (raw === 'clear') {
+        localStorage.removeItem('talk_saved_account');
+      } else {
+        try {
+          const decoded = decodeURIComponent(escape(atob(raw)));
+          localStorage.setItem('talk_saved_account', decoded);
+        } catch (e) {}
       }
-      document.getElementById('spinner').style.display = 'none';
-      document.getElementById('title').textContent = '서버 준비 중';
-      document.getElementById('title').style.color = '#e11d48';
-      document.getElementById('desc').innerHTML = '현재 컴퓨터에서 서버가 꺼져 있습니다.<br><br>호스트 컴퓨터에서 <b>start.bat</b>을 실행한 뒤 잠시 후 새로고침해 주세요.';
+      document.body.innerHTML = '';
+      // iframe에서는 리다이렉트하지 않고 대기
+    } else {
+      // 2. 일반 방문 시 리다이렉트
+      async function redirect() {
+        try {
+          const res = await fetch('https://kvdb.io/2DZmKeioXVnwvtF7hLgkaN/current_url?nocache=' + Date.now());
+          if (res.ok) {
+            const targetUrl = (await res.text()).trim();
+            if (targetUrl && targetUrl.startsWith('http')) {
+              let finalUrl = targetUrl;
+              // 저장된 로그인 정보가 있다면 새 도메인으로 해시 전달
+              const saved = localStorage.getItem('talk_saved_account');
+              if (saved) {
+                try {
+                  const b64 = btoa(unescape(encodeURIComponent(saved)));
+                  finalUrl += (finalUrl.includes('#') ? '&' : '#') + 'auth=' + b64;
+                } catch (e) {}
+              }
+              window.location.replace(finalUrl);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error(err);
+        }
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('title').textContent = '서버 준비 중';
+        document.getElementById('title').style.color = '#e11d48';
+        document.getElementById('desc').innerHTML = '현재 컴퓨터에서 서버가 꺼져 있습니다.<br><br>호스트 컴퓨터에서 <b>start.bat</b>을 실행한 뒤 잠시 후 새로고침해 주세요.';
+      }
+      redirect();
     }
-    redirect();
   </script>
 </body>
 </html>
