@@ -75,5 +75,10 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
     const { title, options } = event.data;
     self.registration.showNotification(title, options);
+  } else if (event.data && event.data.type === 'CLOSE_NOTIFICATION') {
+    const tagToClose = event.data.tag;
+    self.registration.getNotifications({ tag: tagToClose }).then((notifications) => {
+      notifications.forEach((notification) => notification.close());
+    });
   }
 });

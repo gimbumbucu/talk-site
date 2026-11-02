@@ -98,7 +98,8 @@ function reportAppVisibility() {
   const isVisible = document.visibilityState === 'visible' && (document.hasFocus ? document.hasFocus() : true);
   if (socket && socket.connected) {
     socket.emit('app_visibility', { visible: isVisible });
-    if (isVisible) {
+    // 통화 연결 중이거나 통화 중일 때는 중복 수신 모달 방지를 위해 check_pending_call을 보내지 않음!
+    if (isVisible && !isCallConnectingOrActive && !peerConnection) {
       socket.emit('check_pending_call');
     }
   }
@@ -108,7 +109,7 @@ function reportAppVisibility() {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'NOTIFICATION_CLICKED') {
-      if (socket && socket.connected) {
+      if (socket && socket.connected && !isCallConnectingOrActive && !peerConnection) {
         socket.emit('check_pending_call');
       }
     }
@@ -428,6 +429,8 @@ const audioNotification = document.getElementById('audio-notification');
 const audioRingtone = document.getElementById('audio-ringtone');
 
 let pendingIncomingCall = null;
+let isCallConnectingOrActive = false; // 통화 연결 중 또는 통화 중 상태 플래그
+let isRingtonePlaying = false; // 벨소리 재생 상태 플래그
 
 // ==================== 초기 설정 및 이벤트 리스너 ====================
 window.addEventListener('DOMContentLoaded', () => {
@@ -1601,6 +1604,9 @@ async function getMediaStream(callType) {
 }
 
 async function startOutgoingCall(targetUsername, callType) {
+  isCallConnectingOrActive = true;
+  stopRingtone();
+
   activeCallTargetUsername = targetUsername;
   activeCallType = callType;
 
@@ -1630,6 +1636,12 @@ async function startOutgoingCall(targetUsername, callType) {
 }
 
 socket.on('incoming_call', ({ callerSocketId, callerName, callType }) => {
+  // 이미 통화 중이거나 통화 연결 진행 중이면 중복 수신 모달 및 벨소리 무시
+  if (isCallConnectingOrActive || peerConnection) {
+    console.log('[통화 중] 통화 연결 진행 중이므로 수신 요청 무시');
+    return;
+  }
+
   pendingIncomingCall = { callerSocketId, callerName, callType };
 
   callerNameDisplay.textContent = callerName;
@@ -1647,15 +1659,13 @@ socket.on('incoming_call', ({ callerSocketId, callerName, callType }) => {
     });
   }
 
-  if (!isSilentModeEnabled) {
-    audioRingtone.currentTime = 0;
-    audioRingtone.play().catch(() => { });
-  }
+  playRingtone();
 });
 
 // 발신자가 전화를 취소한 경우 → 수신 모달 자동 닫기
 socket.on('call_cancelled', ({ callerName }) => {
   stopRingtone();
+  isCallConnectingOrActive = false;
   incomingCallModal.classList.add('hidden');
   pendingIncomingCall = null;
   showToast({
@@ -1667,10 +1677,16 @@ socket.on('call_cancelled', ({ callerName }) => {
 
 btnAcceptCall.addEventListener('click', async () => {
   if (!pendingIncomingCall) return;
+
+  // 1. 벨소리 즉시 완전 정지
   stopRingtone();
+  // 2. 통화 연결 중 플래그 활성화 (이후 추가적인 벨소리 재생 및 check_pending_call 차단)
+  isCallConnectingOrActive = true;
   incomingCallModal.classList.add('hidden');
 
   const { callerSocketId, callerName, callType } = pendingIncomingCall;
+  pendingIncomingCall = null;
+
   activeCallTargetSocketId = callerSocketId;
   activeCallTargetUsername = callerName;
   activeCallType = callType;
@@ -1692,6 +1708,9 @@ btnAcceptCall.addEventListener('click', async () => {
       voiceOnlyAvatar.classList.add('hidden');
     }
 
+    // 마이크 권한 얻은 직후에도 벨소리 정지 재차 보장
+    stopRingtone();
+
     socket.emit('answer_call', { targetSocketId: callerSocketId, accepted: true });
   } catch (err) {
     console.error('미디어 접근 실패:', err);
@@ -1704,6 +1723,7 @@ btnAcceptCall.addEventListener('click', async () => {
 btnRejectCall.addEventListener('click', () => {
   if (!pendingIncomingCall) return;
   stopRingtone();
+  isCallConnectingOrActive = false;
   incomingCallModal.classList.add('hidden');
 
   socket.emit('answer_call', {
@@ -1730,12 +1750,16 @@ async function flushPendingIceCandidates() {
 }
 
 socket.on('call_answered', async ({ responderSocketId, responderName, accepted, reason }) => {
+  stopRingtone();
+
   if (!accepted) {
+    isCallConnectingOrActive = false;
     alert(`${responderName}님이 통화를 거절했습니다. (${reason || '바쁨'})`);
     cleanupCall();
     return;
   }
 
+  isCallConnectingOrActive = true;
   activeCallTargetSocketId = responderSocketId;
   activeCallStatus.textContent = 'P2P 연결 수립 중...';
 
@@ -1918,6 +1942,9 @@ function initPeerConnection() {
   }
 
   peerConnection.ontrack = (event) => {
+    // 통화 연결 완료 시 벨소리 즉시 100% 완전 정지
+    stopRingtone();
+
     // 상대방 스트림 연결 (모바일 브라우저 호환성을 위해 play() 명시적 실행)
     const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
     remoteStream = stream;
@@ -2031,6 +2058,8 @@ function startCallTimer() {
 }
 
 function cleanupCall() {
+  isCallConnectingOrActive = false;
+  pendingIncomingCall = null;
   stopRingtone();
   stopSilentKeepAlive();
   cleanupMediaSession();
@@ -2074,9 +2103,40 @@ function cleanupCall() {
   pendingIncomingCall = null;
 }
 
+function playRingtone() {
+  if (isSilentModeEnabled) return;
+  if (isCallConnectingOrActive || peerConnection) return;
+
+  isRingtonePlaying = true;
+  try {
+    audioRingtone.currentTime = 0;
+    const playPromise = audioRingtone.play();
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        // play() 비동기 완료 후 이미 정지 플래그가 켜져 있으면 즉각 정지
+        if (!isRingtonePlaying || isCallConnectingOrActive || peerConnection) {
+          audioRingtone.pause();
+          audioRingtone.currentTime = 0;
+        }
+      }).catch(() => { });
+    }
+  } catch (e) { }
+}
+
 function stopRingtone() {
-  audioRingtone.pause();
-  audioRingtone.currentTime = 0;
+  isRingtonePlaying = false;
+  try {
+    audioRingtone.pause();
+    audioRingtone.currentTime = 0;
+  } catch (e) { }
+
+  // 알림 센터에 떠 있는 전화 수신 배너도 즉시 자동 닫기
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'CLOSE_NOTIFICATION',
+      tag: 'incoming-call'
+    });
+  }
 }
 
 function escapeHtml(text) {
