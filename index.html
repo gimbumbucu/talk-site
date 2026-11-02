@@ -1,98 +1,545 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Talk & Call 연결 중...</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      background: #f8fafc;
-      color: #1e293b;
-      text-align: center;
-      padding: 20px;
-      box-sizing: border-box;
-    }
-    .card {
-      background: #ffffff;
-      padding: 32px 24px;
-      border-radius: 20px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
-      max-width: 320px;
-      width: 100%;
-    }
-    .spinner {
-      width: 44px;
-      height: 44px;
-      border: 4px solid #e2e8f0;
-      border-top-color: #2563eb;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 20px auto;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    h2 { font-size: 17px; margin: 0 0 8px 0; color: #0f172a; font-weight: 700; }
-    p { font-size: 13px; color: #64748b; margin: 0; line-height: 1.5; }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content, viewport-fit=cover">
+  <title>Talk & Call</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Talk&Call">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1041/1041916.png">
 </head>
-<body>
-  <div class="card" id="status-card">
-    <div class="spinner" id="spinner"></div>
-    <h2 id="title">대화방 연결 중</h2>
-    <p id="desc">실시간 안전 대화방으로 연결하고 있습니다...</p>
+
+<body class="bg-slate-100 h-screen h-[100dvh] w-screen flex flex-col font-sans select-none overflow-hidden">
+
+  <!-- 로그인 창 (아이디, 비밀번호 입력창만) -->
+  <div id="login-modal" class="fixed inset-0 bg-slate-100 z-50 flex items-center justify-center p-4">
+    <script>
+      if (localStorage.getItem('chat_saved_user') || window.location.hash.includes('auth=')) {
+        document.getElementById('login-modal').classList.add('hidden');
+      }
+    </script>
+    <div class="bg-white rounded-2xl shadow-lg p-6 w-full max-w-xs">
+      <form id="login-form" class="space-y-3">
+        <input type="text" id="username-input" required placeholder="아이디" autocomplete="username"
+          class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-slate-800">
+
+        <input type="password" id="password-input" required placeholder="비밀번호" autocomplete="current-password"
+          class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base text-slate-800">
+
+        <div id="login-error-msg" class="text-xs text-rose-500 font-medium hidden"></div>
+
+        <button type="submit"
+          class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition text-sm">
+          로그인
+        </button>
+      </form>
+    </div>
   </div>
 
-  <script>
-    // 1. 자동 로그인 계정 동기화 (iframe 모드)
-    if (window.location.hash.startsWith('#sync=')) {
-      const raw = window.location.hash.slice(6);
-      if (raw === 'clear') {
-        localStorage.removeItem('talk_saved_account');
-      } else {
-        try {
-          const decoded = decodeURIComponent(escape(atob(raw)));
-          localStorage.setItem('talk_saved_account', decoded);
-        } catch (e) {}
-      }
-      document.body.innerHTML = '';
-      // iframe에서는 리다이렉트하지 않고 대기
-    } else {
-      // 2. 일반 방문 시 리다이렉트
-      async function redirect() {
-        try {
-          const res = await fetch('https://kvdb.io/2DZmKeioXVnwvtF7hLgkaN/current_url?nocache=' + Date.now());
-          if (res.ok) {
-            const targetUrl = (await res.text()).trim();
-            if (targetUrl && targetUrl.startsWith('http')) {
-              let finalUrl = targetUrl;
-              // 저장된 로그인 정보가 있다면 새 도메인으로 해시 전달
-              const saved = localStorage.getItem('talk_saved_account');
-              if (saved) {
-                try {
-                  const b64 = btoa(unescape(encodeURIComponent(saved)));
-                  finalUrl += (finalUrl.includes('#') ? '&' : '#') + 'auth=' + b64;
-                } catch (e) {}
-              }
-              window.location.replace(finalUrl);
-              return;
-            }
-          }
-        } catch (err) {
-          console.error(err);
-        }
-        document.getElementById('spinner').style.display = 'none';
-        document.getElementById('title').textContent = '서버 준비 중';
-        document.getElementById('title').style.color = '#e11d48';
-        document.getElementById('desc').innerHTML = '현재 컴퓨터에서 서버가 꺼져 있습니다.<br><br>호스트 컴퓨터에서 <b>start.bat</b>을 실행한 뒤 잠시 후 새로고침해 주세요.';
-      }
-      redirect();
-    }
-  </script>
+  <!-- 2. 메인 헤더바 -->
+  <header
+    class="bg-white border-b border-slate-200 px-3 sm:px-6 py-2.5 flex items-center justify-between shadow-xs z-20 shrink-0">
+    <div class="flex items-center space-x-2.5">
+      <div
+        class="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white rounded-xl flex items-center justify-center shadow-xs shrink-0">
+        <i class="fa-solid fa-message text-xs sm:text-sm"></i>
+      </div>
+      <div>
+        <h1 class="text-sm sm:text-base font-bold text-slate-800">
+          Talk & Call
+        </h1>
+      </div>
+    </div>
+
+    <!-- 우측 설정 & 유저 정보 -->
+    <div class="flex items-center space-x-2 text-xs sm:text-sm">
+      <!-- 브라우저 푸시 알림 허용 버튼 -->
+      <button id="btn-request-notification"
+        class="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-1 transition text-xs font-medium">
+        <i class="fa-regular fa-bell"></i>
+        <span class="hidden sm:inline">알림</span>
+      </button>
+
+      <!-- 수신자 무음 모드 토글 -->
+      <label
+        class="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 px-2.5 py-1.5 rounded-lg cursor-pointer transition select-none">
+        <input type="checkbox" id="toggle-silent-mode" class="rounded text-blue-600 focus:ring-0">
+        <span class="text-xs font-semibold text-slate-700 flex items-center gap-1">
+          <i class="fa-solid fa-bell-slash text-amber-500"></i>
+          <span class="hidden sm:inline">무음 모드</span>
+        </span>
+      </label>
+
+      <!-- 내 프로필 (클릭하면 프로필 설정 열기) -->
+      <div
+        class="flex items-center space-x-1.5 pl-1.5 border-l border-slate-200 cursor-pointer hover:bg-slate-50 rounded-lg px-1.5 py-0.5 transition"
+        id="btn-open-profile" title="프로필 설정">
+        <div id="my-avatar-circle"
+          class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-xs shrink-0 overflow-hidden border border-slate-200">
+          <span id="my-avatar-char">?</span>
+          <img id="my-avatar-img" class="w-full h-full object-cover hidden" alt="내 프로필">
+        </div>
+        <div class="text-left hidden md:block">
+          <div id="my-username" class="font-semibold text-slate-800 text-xs truncate max-w-[100px]">로그인 필요</div>
+          <div id="my-status-text" class="text-[10px] text-slate-400 truncate max-w-[100px]"></div>
+        </div>
+      </div>
+
+      <!-- 로그아웃 버튼 -->
+      <button id="btn-logout" class="p-1.5 text-xs text-slate-400 hover:text-rose-600 rounded-lg transition"
+        title="로그아웃">
+        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- 3. 메인 콘텐츠 (모바일 반응형: 모바일에서는 사이드바/채팅창 교체 전환, 데스크톱에서는 나란히 표시) -->
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- 좌측 사이드바 (모바일에서는 화면 100%, 데스크톱에서는 w-80) -->
+    <aside id="main-sidebar" class="w-full md:w-80 bg-white border-r border-slate-200 flex flex-col shrink-0">
+      <div class="p-2.5 border-b border-slate-100 flex gap-1">
+        <button id="tab-rooms" class="flex-1 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 rounded-lg transition">
+          <i class="fa-regular fa-comments mr-1"></i> 대화방
+        </button>
+        <button id="tab-users"
+          class="flex-1 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50 rounded-lg transition">
+          <i class="fa-solid fa-users mr-1"></i> 사용자 목록
+        </button>
+      </div>
+
+      <div id="panel-rooms" class="flex-1 overflow-y-auto divide-y divide-slate-50 p-2 space-y-1"></div>
+      <div id="panel-users" class="flex-1 overflow-y-auto divide-y divide-slate-50 p-2 space-y-1 hidden"></div>
+    </aside>
+
+    <!-- 우측 메인 채팅 영역 (모바일에서는 기본 숨김 또는 선택 시 100% 표시) -->
+    <main id="chat-area" class="flex-1 flex flex-col bg-slate-50/70 overflow-hidden relative hidden md:flex">
+
+      <!-- 채팅 헤더 -->
+      <div
+        class="bg-white/95 backdrop-blur px-3 sm:px-6 py-2.5 border-b border-slate-200 flex items-center justify-between shadow-xs shrink-0">
+        <div class="flex items-center min-w-0">
+          <!-- 모바일 전용 목록으로 돌아가기(뒤로가기) 버튼 -->
+          <button id="btn-back-to-rooms"
+            class="md:hidden mr-2 p-1.5 text-slate-600 hover:text-blue-600 text-sm flex items-center justify-center rounded-lg hover:bg-slate-100 transition shrink-0">
+            <i class="fa-solid fa-arrow-left"></i>
+          </button>
+
+          <div
+            class="flex items-center gap-1.5 min-w-0 cursor-pointer hover:bg-slate-50 px-2 py-1 rounded-lg transition"
+            id="btn-edit-peer-name" title="닉네임 변경">
+            <h2 id="current-room-title" class="font-bold text-slate-800 text-sm truncate">
+              1:1 대화방
+            </h2>
+            <i class="fa-solid fa-pen text-slate-400 hover:text-blue-600 text-xs shrink-0"></i>
+          </div>
+        </div>
+
+        <div id="call-action-group" class="flex items-center space-x-1.5 shrink-0">
+          <button id="btn-start-voice-call"
+            class="px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-semibold flex items-center gap-1 transition shadow-xs">
+            <i class="fa-solid fa-phone"></i>
+            <span class="hidden sm:inline">음성 통화</span>
+          </button>
+          <button id="btn-start-video-call"
+            class="px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 text-xs font-semibold flex items-center gap-1 transition shadow-xs">
+            <i class="fa-solid fa-video"></i>
+            <span class="hidden sm:inline">영상 통화</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 메시지 목록 스크롤 영역 -->
+      <div id="messages-container" class="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3"></div>
+
+      <!-- 하단 메시지 입력창 -->
+      <div class="bg-white border-t border-slate-200 p-2.5 sm:p-4 shrink-0">
+        <!-- 수정 모드 바 -->
+        <div id="edit-mode-indicator"
+          class="hidden mb-2 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs flex items-center justify-between">
+          <span class="flex items-center gap-1 truncate">
+            <i class="fa-solid fa-pen text-amber-600"></i> 수정 중...
+          </span>
+          <button id="btn-cancel-edit" class="text-slate-400 hover:text-slate-600 text-xs font-semibold shrink-0">
+            취소
+          </button>
+        </div>
+
+        <!-- 사진 미리보기 바 -->
+        <div id="image-preview-bar"
+          class="hidden mb-2 p-2 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-between">
+          <div class="flex items-center space-x-2.5 min-w-0">
+            <img id="image-preview-thumb" src="" alt="미리보기"
+              class="w-10 h-10 object-cover rounded-lg border border-slate-300 shrink-0">
+            <div class="truncate">
+              <div id="image-preview-name" class="text-xs font-bold text-slate-700 truncate max-w-[180px]">파일명.jpg</div>
+              <div id="image-preview-size" class="text-[10px] text-slate-400">0 KB</div>
+            </div>
+          </div>
+          <button type="button" id="btn-remove-image"
+            class="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-white transition shrink-0"
+            title="사진 제거">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <form id="message-form" class="space-y-1.5">
+          <div class="flex items-center gap-1.5">
+            <label for="image-upload-input"
+              class="w-10 h-10 text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-xl cursor-pointer transition flex items-center justify-center shrink-0">
+              <i class="fa-regular fa-image text-base"></i>
+              <input type="file" id="image-upload-input" accept="image/*" class="hidden">
+            </label>
+
+            <div class="relative flex-1">
+              <input type="text" id="message-input" autocomplete="off" placeholder="메시지 입력..."
+                class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+            </div>
+
+            <button type="submit" id="btn-send-message"
+              class="w-10 h-10 sm:w-auto sm:px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition shadow-xs flex items-center justify-center gap-1 shrink-0">
+              <span id="btn-send-text" class="hidden sm:inline">전송</span>
+              <i class="fa-solid fa-paper-plane text-xs"></i>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between text-xs px-1 text-slate-500">
+            <label class="flex items-center gap-1.5 cursor-pointer hover:text-slate-800 transition select-none">
+              <input type="checkbox" id="toggle-silent-send" class="rounded text-blue-600 focus:ring-0">
+              <span class="font-medium text-slate-600 flex items-center gap-1">
+                <i class="fa-solid fa-bell-slash text-slate-400"></i> 무음 전송
+              </span>
+            </label>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <!-- 프로필 설정 모달 -->
+  <div id="profile-modal"
+    class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl p-5 sm:p-6 w-full max-w-sm animate-bounce-once">
+      <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-slate-800 text-base">프로필 꾸미기</h3>
+        <button type="button" id="btn-close-profile" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- 아바타 변경 영역 -->
+      <div class="flex flex-col items-center mb-4">
+        <div class="relative group" id="profile-avatar-wrapper">
+          <div id="profile-modal-avatar-preview"
+            class="w-20 h-20 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-3xl overflow-hidden border-2 border-slate-200 shadow-sm">
+            <span id="profile-modal-avatar-char">?</span>
+            <img id="profile-modal-avatar-img" class="w-full h-full object-cover hidden" alt="프로필">
+          </div>
+          <label for="profile-avatar-input"
+            class="absolute bottom-0 right-0 w-7 h-7 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow cursor-pointer transition">
+            <i class="fa-solid fa-camera text-xs"></i>
+            <input type="file" id="profile-avatar-input" accept="image/*" class="hidden">
+          </label>
+        </div>
+
+        <div class="flex items-center gap-2 mt-2">
+          <button type="button" id="btn-reset-avatar"
+            class="text-[11px] text-slate-400 hover:text-rose-500 font-medium transition">
+            기본 아바타로 변경
+          </button>
+        </div>
+
+        <!-- 기본 이모지 아바타 선택 칩 -->
+        <div class="w-full mt-3">
+          <div class="text-[11px] font-semibold text-slate-400 mb-1.5 text-left">또는 귀여운 이모지 선택</div>
+          <div class="flex gap-1.5 overflow-x-auto pb-1" id="preset-avatar-chips">
+            <button type="button"
+              class="preset-emoji-btn w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-base flex items-center justify-center shrink-0 transition"
+              data-emoji="🐱">🐱</button>
+            <button type="button"
+              class="preset-emoji-btn w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-base flex items-center justify-center shrink-0 transition"
+              data-emoji="🐶">🐶</button>
+            <button type="button"
+              class="preset-emoji-btn w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-base flex items-center justify-center shrink-0 transition"
+              data-emoji="🦊">🦊</button>
+            <button type="button"
+              class="preset-emoji-btn w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-base flex items-center justify-center shrink-0 transition"
+              data-emoji="🐼">🐼</button>
+            <button type="button"
+              class="preset-emoji-btn w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-base flex items-center justify-center shrink-0 transition"
+              data-emoji="🐰">🐰</button>
+            <button type="button"
+              class="preset-emoji-btn w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-base flex items-center justify-center shrink-0 transition"
+              data-emoji="🦁">🦁</button>
+            <button type="button"
+              class="preset-emoji-btn w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-base flex items-center justify-center shrink-0 transition"
+              data-emoji="🌸">🌸</button>
+            <button type="button"
+              class="preset-emoji-btn w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-base flex items-center justify-center shrink-0 transition"
+              data-emoji="🚀">🚀</button>
+            <button type="button"
+              class="preset-emoji-btn w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-base flex items-center justify-center shrink-0 transition"
+              data-emoji="⭐">⭐</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 입력 필드 -->
+      <form id="profile-edit-form" class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">이름 (닉네임)</label>
+          <input type="text" id="input-display-name" required maxlength="15" placeholder="사용할 닉네임"
+            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 text-slate-800">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">상태 메시지</label>
+          <input type="text" id="input-status-message" maxlength="30" placeholder="기분이나 상태를 적어보세요"
+            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 text-slate-800">
+        </div>
+
+        <div class="pt-2 flex gap-2">
+          <button type="button" id="btn-cancel-profile"
+            class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-sm transition">
+            취소
+          </button>
+          <button type="submit" id="btn-save-profile"
+            class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition shadow-sm">
+            저장
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 대화방 내 닉네임 변경 팝업 모달 -->
+  <div id="nickname-modal"
+    class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl p-5 w-full max-w-xs animate-bounce-once">
+      <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5">
+        <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+          <i class="fa-solid fa-user-pen text-blue-600"></i>
+          <span id="nickname-modal-title">닉네임 변경</span>
+        </h3>
+        <button type="button" id="btn-close-nickname-modal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <form id="form-change-nickname" class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1" id="nickname-modal-label">새 닉네임</label>
+          <input type="text" id="input-new-nickname" required maxlength="15" placeholder="변경할 닉네임 입력" autocomplete="off"
+            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 text-slate-800">
+        </div>
+
+        <div class="pt-1 flex gap-2">
+          <button type="button" id="btn-cancel-nickname"
+            class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-xs transition">
+            취소
+          </button>
+          <button type="submit" id="btn-submit-nickname"
+            class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs transition shadow-sm">
+            변경 완료
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- iOS 사파리 홈 화면 추가 안내 모달 -->
+  <div id="ios-pwa-modal"
+    class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl p-5 w-full max-w-sm animate-bounce-once text-slate-800">
+      <div class="flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5">
+        <h3 class="font-bold text-sm flex items-center gap-2 text-blue-600">
+          <i class="fa-brands fa-apple text-lg"></i>
+          <span>아이폰 푸시 알림 설정</span>
+        </h3>
+        <button type="button" id="btn-close-ios-modal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-base"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs leading-relaxed text-slate-600">
+        <p class="font-medium text-slate-700">
+          Apple 정책상 아이폰에서는 <b>[홈 화면에 추가]</b>를 해야 잠금화면 푸시 알림과 벨소리를 받을 수 있습니다.
+        </p>
+
+        <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-2">
+          <div class="flex items-center gap-2">
+            <span
+              class="w-5 h-5 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-[11px] shrink-0">1</span>
+            <span>사파리 하단 바의 <b>공유 버튼 <i class="fa-solid fa-arrow-up-from-bracket text-blue-600 mx-0.5"></i></b>
+              터치</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span
+              class="w-5 h-5 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-[11px] shrink-0">2</span>
+            <span>메뉴에서 <b>'홈 화면에 추가' <i class="fa-regular fa-square-plus text-slate-700 mx-0.5"></i></b> 선택</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span
+              class="w-5 h-5 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-[11px] shrink-0">3</span>
+            <span>홈 화면에 생긴 <b>Talk&Call 앱</b>으로 실행 후 알림 허용!</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-3">
+        <button type="button" id="btn-confirm-ios-modal"
+          class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs transition shadow-sm">
+          확인했습니다
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- WebRTC 통화 모달 및 화면 -->
+  <div id="incoming-call-modal"
+    class="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-xs text-center animate-bounce-once">
+      <div
+        class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl animate-pulse">
+        <i id="incoming-call-icon" class="fa-solid fa-phone-volume"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-800 mb-1" id="caller-name-display">상대방</h3>
+      <p class="text-xs text-slate-500 mb-5" id="incoming-call-type-display">전화 요청</p>
+
+      <div class="flex items-center justify-center space-x-3">
+        <button id="btn-reject-call"
+          class="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-semibold rounded-xl transition text-sm flex items-center justify-center gap-1.5 shadow-md">
+          <i class="fa-solid fa-phone-slash"></i> 거절
+        </button>
+        <button id="btn-accept-call"
+          class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition text-sm flex items-center justify-center gap-1.5 shadow-md">
+          <i class="fa-solid fa-phone"></i> 수락
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 통화 중 화면 -->
+  <div id="active-call-overlay"
+    class="fixed inset-0 bg-slate-900/95 z-50 flex flex-col justify-between p-4 sm:p-6 hidden">
+    <div class="flex items-center justify-between text-white shrink-0">
+      <div class="flex items-center space-x-2">
+        <!-- 통화 최소화 버튼 (통화하면서 채팅 가능) -->
+        <button id="btn-minimize-call"
+          class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition"
+          title="통화 최소화 (채팅창 보기)">
+          <i class="fa-solid fa-chevron-down text-xs"></i>
+        </button>
+        <!-- 화면 속 화면 (PIP 팝업) 버튼 -->
+        <button id="btn-pip-call"
+          class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition"
+          title="화면 속 화면 (PIP 미니창)">
+          <i class="fa-solid fa-clone text-xs"></i>
+        </button>
+        <div>
+          <h3 id="active-call-peer-name" class="font-bold text-base sm:text-lg">상대방</h3>
+          <p id="active-call-status" class="text-xs text-slate-400">연결 중...</p>
+        </div>
+      </div>
+      <div class="text-center bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700">
+        <span id="call-timer" class="font-mono text-sm sm:text-base font-bold text-emerald-400">00:00</span>
+      </div>
+    </div>
+
+    <div class="flex-1 flex items-center justify-center relative my-3 overflow-hidden rounded-2xl bg-slate-800/50">
+      <video id="remote-video" autoplay playsinline webkit-playsinline muted
+        class="w-full h-full object-cover rounded-2xl"></video>
+      <div id="local-video-container"
+        class="absolute bottom-3 right-3 w-28 h-36 sm:w-36 sm:h-48 bg-slate-800 rounded-xl overflow-hidden shadow-2xl border-2 border-slate-600">
+        <video id="local-video" autoplay playsinline webkit-playsinline muted
+          class="w-full h-full object-cover"></video>
+      </div>
+
+      <div id="voice-only-avatar" class="flex flex-col items-center justify-center">
+        <div
+          class="w-20 h-20 sm:w-28 sm:h-28 rounded-full bg-blue-600/30 border-4 border-blue-500 text-white flex items-center justify-center text-3xl sm:text-4xl mb-3 animate-pulse">
+          <i class="fa-solid fa-user"></i>
+        </div>
+        <p class="text-slate-300 font-medium text-xs sm:text-sm">음성 통화 중</p>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-center space-x-5 py-3 shrink-0">
+      <button id="btn-toggle-mic"
+        class="w-[50px] h-[50px] sm:w-[56px] sm:h-[56px] rounded-full bg-slate-700/90 hover:bg-slate-600 text-white text-lg sm:text-xl flex items-center justify-center transition shadow-lg active:scale-95"
+        title="마이크 켜기/끄기">
+        <i class="fa-solid fa-microphone"></i>
+      </button>
+      <button id="btn-toggle-cam"
+        class="w-[50px] h-[50px] sm:w-[56px] sm:h-[56px] rounded-full bg-slate-700/90 hover:bg-slate-600 text-white text-lg sm:text-xl flex items-center justify-center transition shadow-lg active:scale-95"
+        title="카메라 켜기/끄기">
+        <i class="fa-solid fa-video"></i>
+      </button>
+      <button id="btn-hangup"
+        class="w-[64px] h-[64px] sm:w-[72px] sm:h-[72px] rounded-full bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-[26px] sm:text-[30px] flex items-center justify-center transition shadow-xl shadow-rose-900/60 active:scale-95"
+        title="통화 종료">
+        <i class="fa-solid fa-phone-slash"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- 통화 최소화 플로팅 바 (통화 중 채팅/다른 화면을 볼 때 상단 표시) -->
+  <div id="floating-call-bar"
+    class="fixed top-12 left-1/2 -translate-x-1/2 z-40 bg-emerald-600 text-white px-4 py-2 rounded-full shadow-xl flex items-center space-x-3 cursor-pointer hidden animate-pulse">
+    <i class="fa-solid fa-phone-volume text-xs"></i>
+    <span id="floating-call-name" class="text-xs font-bold">상대방과 통화 중</span>
+    <span id="floating-call-timer"
+      class="text-xs font-mono font-semibold bg-emerald-700/60 px-2 py-0.5 rounded-full">00:00</span>
+    <button id="btn-floating-hangup"
+      class="w-8 h-8 rounded-full bg-rose-500 hover:bg-rose-600 flex items-center justify-center text-white text-sm ml-1.5 shadow-sm active:scale-95"
+      title="통화 종료">
+      <i class="fa-solid fa-phone-slash"></i>
+    </button>
+  </div>
+
+  <!-- 백그라운드 독립 오디오 재생 엘리먼트 -->
+  <audio id="remote-audio" autoplay playsinline></audio>
+
+  <!-- 라이트박스 -->
+  <div id="lightbox-modal"
+    class="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+    <div class="relative max-w-full max-h-[90vh] flex flex-col items-center">
+      <button id="btn-close-lightbox"
+        class="absolute -top-10 right-0 text-white hover:text-slate-300 text-2xl transition p-2">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <img id="lightbox-img" src="" alt="원본 사진" class="max-w-full max-h-[75vh] object-contain rounded-xl shadow-2xl">
+      <div class="mt-3 flex items-center gap-3">
+        <a id="btn-download-lightbox" href="" download
+          class="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-semibold backdrop-blur transition flex items-center gap-2">
+          <i class="fa-solid fa-download"></i> 다운로드
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 인앱 토스트 컨테이너 -->
+  <div id="toast-container" class="fixed top-14 right-3 sm:right-6 z-50 space-y-2 pointer-events-none max-w-xs"></div>
+
+  <!-- 오디오 알림 -->
+  <audio id="audio-notification" preload="auto">
+    <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+  </audio>
+  <audio id="audio-ringtone" loop preload="auto">
+    <source src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" type="audio/mpeg">
+  </audio>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="app.js"></script>
 </body>
+
 </html>
