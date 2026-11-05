@@ -116,8 +116,16 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-document.addEventListener('visibilitychange', reportAppVisibility);
-window.addEventListener('focus', reportAppVisibility);
+document.addEventListener('visibilitychange', () => {
+  reportAppVisibility();
+  if (document.visibilityState === 'visible') {
+    scrollToBottom(false);
+  }
+});
+window.addEventListener('focus', () => {
+  reportAppVisibility();
+  scrollToBottom(false);
+});
 window.addEventListener('blur', () => {
   if (socket && socket.connected) {
     socket.emit('app_visibility', { visible: false });
@@ -1109,7 +1117,17 @@ function renderMessages(messages) {
     appendMessage(msg, false);
   });
 
-  scrollToBottom();
+  // 첨부된 모든 사진/이미지가 비동기 로딩될 때마다 높이 변화에 맞춰 맨 아래 위치 고정
+  const imgs = messagesContainer.querySelectorAll('img');
+  imgs.forEach((img) => {
+    if (!img.complete) {
+      img.addEventListener('load', () => scrollToBottom(false), { once: true });
+      img.addEventListener('error', () => scrollToBottom(false), { once: true });
+    }
+  });
+
+  // 대화의 맨 마지막(최신 메시지)으로 강제 스크롤
+  scrollToBottom(false);
 }
 
 function appendMessage(msg, scroll = true) {
@@ -1222,13 +1240,46 @@ function appendMessage(msg, scroll = true) {
   }
 
   messagesContainer.appendChild(row);
+
+  const imgEl = row.querySelector('img');
+  if (imgEl && !imgEl.complete) {
+    imgEl.addEventListener('load', () => scrollToBottom(false), { once: true });
+    imgEl.addEventListener('error', () => scrollToBottom(false), { once: true });
+  }
+
   if (scroll) scrollToBottom();
 }
 
-function scrollToBottom() {
-  requestAnimationFrame(() => {
+function scrollToBottom(smooth = false) {
+  if (!messagesContainer) return;
+
+  const doScroll = () => {
+    if (!messagesContainer) return;
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    const lastChild = messagesContainer.lastElementChild;
+    if (lastChild && typeof lastChild.scrollIntoView === 'function') {
+      try {
+        lastChild.scrollIntoView({ block: 'end', behavior: smooth ? 'smooth' : 'auto' });
+      } catch (e) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    }
+  };
+
+  // 1. 즉시 1회 실행
+  doScroll();
+
+  // 2. 브라우저 다음 렌더링 프레임에 재실행
+  requestAnimationFrame(() => {
+    doScroll();
+    requestAnimationFrame(doScroll);
   });
+
+  // 3. 모바일 레이아웃 계산 지연 및 이미지 렌더링 타이밍 대응 다단계 보장
+  setTimeout(doScroll, 50);
+  setTimeout(doScroll, 150);
+  setTimeout(doScroll, 300);
+  setTimeout(doScroll, 500);
 }
 
 // ==================== 4. 메시지 및 사진 전송 ====================
