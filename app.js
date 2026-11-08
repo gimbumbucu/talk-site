@@ -503,6 +503,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
   let selectedCommandIndex = 0;
   let filteredCommands = [];
+  let lastSubmitTime = 0;
+  let isSendingMessage = false;
 
   function checkSlashCommands() {
     if (!messageInput || !slashCommandsPopup) return;
@@ -605,7 +607,11 @@ window.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       closeSlashCommands();
       messageInput.focus();
-      // submit 이벤트 직접 디스패치
+
+      const now = Date.now();
+      if (now - lastSubmitTime < 300) return;
+      lastSubmitTime = now;
+
       if (typeof messageForm.requestSubmit === 'function') {
         messageForm.requestSubmit();
       } else {
@@ -616,17 +622,20 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // 전송 버튼 터치 시 입력창 blur 방지 -> 모바일 가상 키보드가 닫히지 않고 열린 상태 유지!
   if (btnSendMessage) {
-    const handleSendTap = (e) => {
+    btnSendMessage.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       messageInput.focus();
+
+      const now = Date.now();
+      if (now - lastSubmitTime < 300) return;
+      lastSubmitTime = now;
+
       if (typeof messageForm.requestSubmit === 'function') {
         messageForm.requestSubmit();
       } else {
         messageForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
       }
-    };
-    btnSendMessage.addEventListener('pointerdown', handleSendTap);
-    btnSendMessage.addEventListener('touchstart', handleSendTap, { passive: false });
+    });
   }
 
   // 실시간 타이핑 감지 및 슬래시 명령어 자동완성 체크
@@ -2067,15 +2076,25 @@ function scrollToBottom(smooth = false) {
 
 messageForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  let text = messageInput.value.trim();
 
-  if (!text && !selectedMediaFile) {
+  const now = Date.now();
+  if (now - lastSubmitTime < 250 && isSendingMessage) return;
+  lastSubmitTime = now;
+
+  let text = messageInput.value.trim();
+  const mediaFile = selectedMediaFile;
+  const mediaType = selectedMediaType;
+
+  if (!text && !mediaFile) {
     messageInput.focus();
     return;
   }
 
-  // 모바일 가상 키보드가 닫히지 않도록 포커스 즉시 유지
+  // 중복 전송 방지: 입력창 즉시 비우고 전송 상태 활성화
+  messageInput.value = '';
+  clearSelectedMedia();
   messageInput.focus();
+  isSendingMessage = true;
 
   if (editingMessageId) {
     socket.emit('edit_message', {
@@ -2083,10 +2102,12 @@ messageForm.addEventListener('submit', async (e) => {
       messageId: editingMessageId,
       newText: text
     }, (res) => {
+      isSendingMessage = false;
       if (res.success) {
         cancelEditMode();
       } else {
         alert(res.message || '수정 실패');
+        messageInput.value = text;
       }
       messageInput.focus();
     });
@@ -2096,11 +2117,11 @@ messageForm.addEventListener('submit', async (e) => {
     let fileSize = null;
     let fileType = null;
 
-    if (selectedMediaFile) {
+    if (mediaFile) {
       btnSendText.textContent = '업로드 중...';
       try {
         const formData = new FormData();
-        formData.append('image', selectedMediaFile);
+        formData.append('image', mediaFile);
 
         const uploadRes = await fetch(getFullUrl('/api/upload'), {
           method: 'POST',
@@ -2112,10 +2133,11 @@ messageForm.addEventListener('submit', async (e) => {
           fileUrl = uploadData.fileUrl;
           fileName = uploadData.fileName;
           fileSize = uploadData.fileSize;
-          fileType = uploadData.fileType || selectedMediaType;
+          fileType = uploadData.fileType || mediaType;
         } else {
           alert('파일 업로드 실패: ' + uploadData.message);
           btnSendText.textContent = '전송';
+          isSendingMessage = false;
           messageInput.focus();
           return;
         }
@@ -2123,6 +2145,7 @@ messageForm.addEventListener('submit', async (e) => {
         console.error('업로드 에러:', err);
         alert('파일 저장 중 오류가 발생했습니다.');
         btnSendText.textContent = '전송';
+        isSendingMessage = false;
         messageInput.focus();
         return;
       }
@@ -2145,6 +2168,7 @@ messageForm.addEventListener('submit', async (e) => {
       fileType: replyingToMessage.fileType || null
     } : null;
 
+    cancelReplyMode();
     stopMyTyping();
 
     socket.emit('send_message', {
@@ -2157,15 +2181,14 @@ messageForm.addEventListener('submit', async (e) => {
       fileType,
       replyTo: replyPayload
     }, (res) => {
+      isSendingMessage = false;
       btnSendText.textContent = '전송';
-      if (res.success) {
-        messageInput.value = '';
-        clearSelectedMedia();
-        cancelReplyMode();
-        stopMyTyping();
-        // 모바일/PC 구분 없이 항상 포커스 유지하여 키보드 내려감 차단
-        messageInput.focus();
+      if (!res.success) {
+        alert(res.message || '전송 실패');
+        messageInput.value = text;
       }
+      // 모바일/PC 구분 없이 항상 포커스 유지하여 키보드 내려감 차단
+      messageInput.focus();
     });
   }
 });
