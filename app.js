@@ -1880,30 +1880,6 @@ function appendMessage(msg, scroll = true) {
     `;
   }
 
-  // 액션 버튼: 내 메시지는 [답장, 복사, 수정, 삭제], 상대방 메시지는 [답장, 복사]
-  let actionsHtml = '';
-  if (!msg.isDeleted) {
-    if (isMy) {
-      actionsHtml = `
-        <div class="message-actions">
-          <button class="message-action-btn reply-btn" onclick="startReplyMessage('${msg.id}')"><i class="fa-solid fa-reply"></i> 답장</button>
-          <button class="message-action-btn copy-btn" onclick="copyMessageText('${msg.id}')"><i class="fa-regular fa-copy"></i> 복사</button>
-          ${!msg.fileUrl ? `<button class="message-action-btn edit-btn" onclick="startEditMessage('${msg.id}', '${encodeURIComponent(msg.text)}')"><i class="fa-solid fa-pen"></i> 수정</button>` : ''}
-          <button class="message-action-btn delete-btn" onclick="deleteMessage('${msg.id}')">
-            <i class="fa-solid fa-trash-can"></i> 삭제
-          </button>
-        </div>
-      `;
-    } else {
-      actionsHtml = `
-        <div class="message-actions">
-          <button class="message-action-btn reply-btn" onclick="startReplyMessage('${msg.id}')"><i class="fa-solid fa-reply"></i> 답장</button>
-          <button class="message-action-btn copy-btn" onclick="copyMessageText('${msg.id}')"><i class="fa-regular fa-copy"></i> 복사</button>
-        </div>
-      `;
-    }
-  }
-
   let bubbleContent = '';
   if (msg.isDeleted) {
     bubbleContent = `<span class="deleted-message px-3 py-1.5 rounded-lg inline-block text-xs"><i class="fa-solid fa-ban mr-1"></i>삭제된 메시지입니다.</span>`;
@@ -1949,7 +1925,6 @@ function appendMessage(msg, scroll = true) {
 
   if (isMy) {
     row.innerHTML = `
-      ${actionsHtml}
       <div class="meta-info">
         ${unreadBadgeHtml}
         <span class="time-stamp flex items-center">
@@ -1977,7 +1952,6 @@ function appendMessage(msg, scroll = true) {
           </div>
         </div>
       </div>
-      ${actionsHtml}
     `;
   }
 
