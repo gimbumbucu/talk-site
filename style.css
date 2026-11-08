@@ -157,8 +157,7 @@ body {
 .message-actions {
   display: none;
   position: absolute;
-  top: -12px;
-  right: 10px;
+  top: -14px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
@@ -168,9 +167,40 @@ body {
   z-index: 10;
 }
 
-.message-row:hover .message-actions,
-.message-row.active .message-actions {
+.my-message .message-actions {
+  right: 10px;
+  left: auto;
+}
+
+.other-message .message-actions {
+  left: 42px;
+  right: auto;
+}
+
+.message-row:hover .message-actions {
   display: flex;
+}
+
+/* 메시지 꾹 누르기 (Long Press) 팝업 메뉴 */
+#message-context-backdrop {
+  background: rgba(0, 0, 0, 0.2);
+  -webkit-tap-highlight-color: transparent;
+}
+
+#message-context-menu {
+  animation: contextMenuPop 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: center bottom;
+}
+
+@keyframes contextMenuPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .message-action-btn {

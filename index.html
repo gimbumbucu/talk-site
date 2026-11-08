@@ -645,6 +645,32 @@
     </div>
   </div>
 
+  <!-- 메시지 꾹 눌렀을 때 뜨는 액션 팝업 메뉴 (Long Press Menu) -->
+  <div id="message-context-backdrop" class="fixed inset-0 z-40 hidden"></div>
+  <div id="message-context-menu"
+    class="fixed z-50 bg-slate-900/95 text-white backdrop-blur-md rounded-2xl shadow-2xl p-1.5 flex items-center gap-1 border border-white/15 hidden select-none">
+    <button type="button" id="ctx-btn-reply"
+      class="flex flex-col items-center justify-center px-3 py-1.5 hover:bg-white/15 active:bg-white/25 rounded-xl text-xs font-semibold gap-1 transition">
+      <i class="fa-solid fa-reply text-blue-400 text-sm"></i>
+      <span>답장</span>
+    </button>
+    <button type="button" id="ctx-btn-copy"
+      class="flex flex-col items-center justify-center px-3 py-1.5 hover:bg-white/15 active:bg-white/25 rounded-xl text-xs font-semibold gap-1 transition">
+      <i class="fa-regular fa-copy text-emerald-400 text-sm"></i>
+      <span>복사</span>
+    </button>
+    <button type="button" id="ctx-btn-edit"
+      class="flex flex-col items-center justify-center px-3 py-1.5 hover:bg-white/15 active:bg-white/25 rounded-xl text-xs font-semibold gap-1 transition">
+      <i class="fa-solid fa-pen text-amber-400 text-sm"></i>
+      <span>수정</span>
+    </button>
+    <button type="button" id="ctx-btn-delete"
+      class="flex flex-col items-center justify-center px-3 py-1.5 hover:bg-white/15 active:bg-white/25 rounded-xl text-xs font-semibold gap-1 transition text-rose-400 hover:text-rose-300">
+      <i class="fa-solid fa-trash-can text-sm"></i>
+      <span>삭제</span>
+    </button>
+  </div>
+
   <!-- 인앱 토스트 컨테이너 -->
   <div id="toast-container" class="fixed top-14 right-3 sm:right-6 z-50 space-y-2 pointer-events-none max-w-xs"></div>
 

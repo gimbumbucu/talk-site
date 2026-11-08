@@ -386,9 +386,20 @@ const btnStartVideoCall = document.getElementById('btn-start-video-call');
 const messagesContainer = document.getElementById('messages-container');
 const messageForm = document.getElementById('message-form');
 const messageInput = document.getElementById('message-input');
+const btnSendMessage = document.getElementById('btn-send-message');
 const editModeIndicator = document.getElementById('edit-mode-indicator');
 const btnCancelEdit = document.getElementById('btn-cancel-edit');
 const btnSendText = document.getElementById('btn-send-text');
+
+// 꾹 누르기 컨텍스트 메뉴 DOM (Long Press Menu)
+const messageContextMenu = document.getElementById('message-context-menu');
+const messageContextBackdrop = document.getElementById('message-context-backdrop');
+const ctxBtnReply = document.getElementById('ctx-btn-reply');
+const ctxBtnCopy = document.getElementById('ctx-btn-copy');
+const ctxBtnEdit = document.getElementById('ctx-btn-edit');
+const ctxBtnDelete = document.getElementById('ctx-btn-delete');
+let activeContextMsg = null;
+const allMessagesMap = new Map();
 
 // 미디어 첨부 & 플러스 메뉴 DOM
 const btnAttachMenu = document.getElementById('btn-attach-menu');
@@ -593,6 +604,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       closeSlashCommands();
+      messageInput.focus();
       // submit 이벤트 직접 디스패치
       if (typeof messageForm.requestSubmit === 'function') {
         messageForm.requestSubmit();
@@ -601,6 +613,21 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+
+  // 전송 버튼 터치 시 입력창 blur 방지 -> 모바일 가상 키보드가 닫히지 않고 열린 상태 유지!
+  if (btnSendMessage) {
+    const handleSendTap = (e) => {
+      e.preventDefault();
+      messageInput.focus();
+      if (typeof messageForm.requestSubmit === 'function') {
+        messageForm.requestSubmit();
+      } else {
+        messageForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      }
+    };
+    btnSendMessage.addEventListener('pointerdown', handleSendTap);
+    btnSendMessage.addEventListener('touchstart', handleSendTap, { passive: false });
+  }
 
   // 실시간 타이핑 감지 및 슬래시 명령어 자동완성 체크
   messageInput.addEventListener('input', () => {
@@ -1271,17 +1298,133 @@ if (btnFinishDraw) {
   });
 }
 
+// ==================== 롱프레스 (Long Press) 컨텍스트 메뉴 ====================
+function openContextMenu(msg, clientX, clientY) {
+  if (!msg || !messageContextMenu) return;
+  activeContextMsg = msg;
+  const isMy = currentUser && msg.senderName === currentUser.username;
+
+  // 내 메시지: [답장, 복사, 수정(텍스트만), 삭제]
+  // 상대방 메시지: [답장, 복사]만 표시
+  if (ctxBtnEdit) {
+    ctxBtnEdit.style.display = (isMy && !msg.fileUrl && !msg.isDeleted) ? 'flex' : 'none';
+  }
+  if (ctxBtnDelete) {
+    ctxBtnDelete.style.display = (isMy && !msg.isDeleted) ? 'flex' : 'none';
+  }
+  if (ctxBtnReply) {
+    ctxBtnReply.style.display = msg.isDeleted ? 'none' : 'flex';
+  }
+  if (ctxBtnCopy) {
+    ctxBtnCopy.style.display = msg.isDeleted ? 'none' : 'flex';
+  }
+
+  if (messageContextBackdrop) messageContextBackdrop.classList.remove('hidden');
+  messageContextMenu.classList.remove('hidden');
+
+  requestAnimationFrame(() => {
+    const menuRect = messageContextMenu.getBoundingClientRect();
+    const menuW = menuRect.width || 220;
+    const menuH = menuRect.height || 60;
+    const margin = 12;
+
+    let left = clientX - (menuW / 2);
+    let top = clientY - menuH - 14;
+
+    if (top < margin) {
+      top = clientY + 20; // 위쪽 공간 없으면 아래에 띄움
+    }
+    if (left < margin) left = margin;
+    if (left + menuW > window.innerWidth - margin) {
+      left = window.innerWidth - menuW - margin;
+    }
+
+    messageContextMenu.style.left = `${left}px`;
+    messageContextMenu.style.top = `${top}px`;
+  });
+}
+
+function closeContextMenu() {
+  if (messageContextMenu) messageContextMenu.classList.add('hidden');
+  if (messageContextBackdrop) messageContextBackdrop.classList.add('hidden');
+  activeContextMsg = null;
+}
+
+if (messageContextBackdrop) {
+  messageContextBackdrop.addEventListener('click', closeContextMenu);
+  messageContextBackdrop.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    closeContextMenu();
+  }, { passive: false });
+}
+
+if (ctxBtnReply) {
+  ctxBtnReply.addEventListener('click', () => {
+    if (activeContextMsg) {
+      startReplyMessage(activeContextMsg.id);
+    }
+    closeContextMenu();
+  });
+}
+
+if (ctxBtnCopy) {
+  ctxBtnCopy.addEventListener('click', () => {
+    if (activeContextMsg) {
+      copyMessageText(activeContextMsg.id);
+    }
+    closeContextMenu();
+  });
+}
+
+if (ctxBtnEdit) {
+  ctxBtnEdit.addEventListener('click', () => {
+    if (activeContextMsg) {
+      startEditMessage(activeContextMsg.id, encodeURIComponent(activeContextMsg.text || ''));
+    }
+    closeContextMenu();
+  });
+}
+
+if (ctxBtnDelete) {
+  ctxBtnDelete.addEventListener('click', () => {
+    if (activeContextMsg) {
+      deleteMessage(activeContextMsg.id);
+    }
+    closeContextMenu();
+  });
+}
+
 // ==================== 답장 (Reply) & 복사 (Copy) ====================
 window.startReplyMessage = function(msgId) {
-  if (!currentRoom || !currentRoom.messages) return;
-  const targetMsg = currentRoom.messages.find((m) => m.id === msgId);
-  if (!targetMsg) return;
+  const targetMsg = allMessagesMap.get(msgId) || (currentRoom && currentRoom.messages ? currentRoom.messages.find((m) => m.id === msgId) : null);
+  
+  if (!targetMsg) {
+    const row = document.getElementById(`msg-el-${msgId}`);
+    if (!row) return;
+    const bubble = row.querySelector('.message-bubble');
+    const senderNameEl = row.querySelector('.text-\\[11px\\]');
+    const senderName = senderNameEl ? senderNameEl.textContent.trim() : '상대방';
+    let text = '';
+    if (bubble) {
+      const clone = bubble.cloneNode(true);
+      const q = clone.querySelector('.reply-quote-box');
+      if (q) q.remove();
+      text = clone.innerText.trim();
+    }
+    replyingToMessage = {
+      id: msgId,
+      senderName: senderName,
+      senderDisplayName: senderName,
+      text: text
+    };
+  } else {
+    replyingToMessage = targetMsg;
+  }
 
-  replyingToMessage = targetMsg;
-  const targetName = targetMsg.senderDisplayName || targetMsg.senderName || '상대방';
-  let targetSnippet = targetMsg.text;
+  const targetName = replyingToMessage.senderDisplayName || replyingToMessage.senderName || '상대방';
+  let targetSnippet = replyingToMessage.text;
   if (!targetSnippet) {
-    targetSnippet = targetMsg.fileType === 'video' ? '[동영상]' : '[사진]';
+    targetSnippet = replyingToMessage.fileType === 'video' ? '[동영상]' : '[사진]';
   }
 
   replyTargetName.textContent = targetName;
@@ -1301,27 +1444,58 @@ if (btnCancelReply) {
   btnCancelReply.addEventListener('click', cancelReplyMode);
 }
 
-// 메시지 복사
+// 메시지 복사 (100% 보장: 내 메시지 + 상대방 메시지 완벽 지원)
 window.copyMessageText = function(msgId) {
-  if (!currentRoom || !currentRoom.messages) return;
-  const targetMsg = currentRoom.messages.find((m) => m.id === msgId);
-  if (!targetMsg) return;
+  let textToCopy = '';
+  const targetMsg = allMessagesMap.get(msgId) || (currentRoom && currentRoom.messages ? currentRoom.messages.find((m) => m.id === msgId) : null);
+  if (targetMsg) {
+    textToCopy = targetMsg.text || targetMsg.fileUrl || '';
+  }
 
-  const textToCopy = targetMsg.text || targetMsg.fileUrl || '';
-  if (!textToCopy) return;
+  if (!textToCopy) {
+    const row = document.getElementById(`msg-el-${msgId}`);
+    if (row) {
+      const bubble = row.querySelector('.message-bubble');
+      if (bubble) {
+        const clone = bubble.cloneNode(true);
+        const q = clone.querySelector('.reply-quote-box');
+        if (q) q.remove();
+        textToCopy = clone.innerText.trim();
+      }
+    }
+  }
 
-  navigator.clipboard.writeText(textToCopy).then(() => {
-    showToast({ title: '메시지가 클립보드에 복사되었습니다.', body: '', isSilent: true });
-  }).catch(() => {
-    // 대체 복사
+  if (!textToCopy) {
+    showToast({ title: '복사할 메시지 내용이 없습니다.', body: '', isSilent: true });
+    return;
+  }
+
+  const copyWithExecCommand = () => {
     const tempInput = document.createElement('textarea');
     tempInput.value = textToCopy;
+    tempInput.style.position = 'fixed';
+    tempInput.style.opacity = '0';
+    tempInput.style.left = '-9999px';
     document.body.appendChild(tempInput);
     tempInput.select();
-    document.execCommand('copy');
+    try {
+      document.execCommand('copy');
+      showToast({ title: '📋 메시지가 복사되었습니다.', body: '', isSilent: true });
+    } catch (e) {
+      showToast({ title: '복사 실패', body: '', isSilent: true });
+    }
     document.body.removeChild(tempInput);
-    showToast({ title: '메시지가 클립보드에 복사되었습니다.', body: '', isSilent: true });
-  });
+  };
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      showToast({ title: '📋 메시지가 복사되었습니다.', body: '', isSilent: true });
+    }).catch(() => {
+      copyWithExecCommand();
+    });
+  } else {
+    copyWithExecCommand();
+  }
 };
 
 // 답장 원본 메시지로 이동
@@ -1640,11 +1814,13 @@ function formatShortTime(isoString) {
 
 function renderMessages(messages) {
   messagesContainer.innerHTML = '';
+  allMessagesMap.clear();
   if (!messages || messages.length === 0) {
     return;
   }
 
   messages.forEach((msg) => {
+    allMessagesMap.set(msg.id, msg);
     appendMessage(msg, false);
   });
 
@@ -1767,6 +1943,10 @@ function appendMessage(msg, scroll = true) {
     `;
   }
 
+  if (msg.id) {
+    allMessagesMap.set(msg.id, msg);
+  }
+
   if (isMy) {
     row.innerHTML = `
       ${actionsHtml}
@@ -1778,14 +1958,6 @@ function appendMessage(msg, scroll = true) {
       </div>
       ${bubbleContent}
     `;
-
-    // 모바일 터치 시 액션 메뉴 토글
-    if (!msg.isDeleted) {
-      row.addEventListener('click', (e) => {
-        if (e.target.closest('.message-actions') || e.target.closest('.reply-quote-box') || e.target.closest('video')) return;
-        row.classList.toggle('active');
-      });
-    }
   } else {
     const senderProfile = userProfilesMap.get(msg.senderName);
     const senderDisplay = senderProfile?.displayName || msg.senderDisplayName || msg.senderName;
@@ -1807,14 +1979,66 @@ function appendMessage(msg, scroll = true) {
       </div>
       ${actionsHtml}
     `;
+  }
 
-    // 모바일 터치 시 액션 메뉴 토글 (답장/복사)
-    if (!msg.isDeleted) {
-      row.addEventListener('click', (e) => {
-        if (e.target.closest('.message-actions') || e.target.closest('.reply-quote-box') || e.target.closest('video')) return;
-        row.classList.toggle('active');
-      });
-    }
+  // 꾹 누르기 (Long Press: 카카오톡/인스타그램 스타일) 및 우클릭 메뉴
+  if (!msg.isDeleted) {
+    let longPressTimer = null;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let isLongPressed = false;
+
+    const startPress = (x, y) => {
+      isLongPressed = false;
+      touchStartX = x;
+      touchStartY = y;
+      longPressTimer = setTimeout(() => {
+        isLongPressed = true;
+        if ('vibrate' in navigator) {
+          try { navigator.vibrate(40); } catch (e) {}
+        }
+        openContextMenu(msg, touchStartX, touchStartY);
+      }, 400);
+    };
+
+    const cancelPress = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    };
+
+    row.addEventListener('touchstart', (e) => {
+      if (e.target.closest('video') || e.target.closest('a') || e.target.closest('button')) return;
+      const touch = e.touches[0];
+      if (touch) {
+        startPress(touch.clientX, touch.clientY);
+      }
+    }, { passive: true });
+
+    row.addEventListener('touchmove', (e) => {
+      const touch = e.touches[0];
+      if (touch && (Math.abs(touch.clientX - touchStartX) > 10 || Math.abs(touch.clientY - touchStartY) > 10)) {
+        cancelPress();
+      }
+    }, { passive: true });
+
+    row.addEventListener('touchend', (e) => {
+      cancelPress();
+      if (isLongPressed) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+
+    row.addEventListener('touchcancel', cancelPress);
+
+    // PC 마우스 우클릭 (contextmenu)
+    row.addEventListener('contextmenu', (e) => {
+      if (e.target.closest('video') || e.target.closest('a') || e.target.closest('button')) return;
+      e.preventDefault();
+      openContextMenu(msg, e.clientX, e.clientY);
+    });
   }
 
   messagesContainer.appendChild(row);
@@ -1871,7 +2095,13 @@ messageForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   let text = messageInput.value.trim();
 
-  if (!text && !selectedMediaFile) return;
+  if (!text && !selectedMediaFile) {
+    messageInput.focus();
+    return;
+  }
+
+  // 모바일 가상 키보드가 닫히지 않도록 포커스 즉시 유지
+  messageInput.focus();
 
   if (editingMessageId) {
     socket.emit('edit_message', {
@@ -1884,6 +2114,7 @@ messageForm.addEventListener('submit', async (e) => {
       } else {
         alert(res.message || '수정 실패');
       }
+      messageInput.focus();
     });
   } else {
     let fileUrl = null;
@@ -1911,12 +2142,14 @@ messageForm.addEventListener('submit', async (e) => {
         } else {
           alert('파일 업로드 실패: ' + uploadData.message);
           btnSendText.textContent = '전송';
+          messageInput.focus();
           return;
         }
       } catch (err) {
         console.error('업로드 에러:', err);
         alert('파일 저장 중 오류가 발생했습니다.');
         btnSendText.textContent = '전송';
+        messageInput.focus();
         return;
       }
     }
@@ -1956,9 +2189,8 @@ messageForm.addEventListener('submit', async (e) => {
         clearSelectedMedia();
         cancelReplyMode();
         stopMyTyping();
-        if (window.innerWidth >= 768 && document.activeElement !== messageInput) {
-          messageInput.focus();
-        }
+        // 모바일/PC 구분 없이 항상 포커스 유지하여 키보드 내려감 차단
+        messageInput.focus();
       }
     });
   }
@@ -2076,6 +2308,13 @@ socket.on('user_typing_stop', ({ roomId, username }) => {
 
 socket.on('new_message', (msg) => {
   if (msg.roomId === currentRoomId) {
+    allMessagesMap.set(msg.id, msg);
+    if (currentRoom) {
+      if (!currentRoom.messages) currentRoom.messages = [];
+      if (!currentRoom.messages.some((m) => m.id === msg.id)) {
+        currentRoom.messages.push(msg);
+      }
+    }
     // 새 메시지가 오면 상대방의 타이핑 표시 즉시 제거
     activeTypingUsers.delete(msg.senderName);
     renderTypingIndicator();
@@ -2098,11 +2337,23 @@ socket.on('messages_read_bulk', ({ roomId, username }) => {
 
 socket.on('message_edited', ({ roomId, messageId, newText, editedAt }) => {
   if (roomId === currentRoomId) {
+    const cached = allMessagesMap.get(messageId);
+    if (cached) {
+      cached.text = newText;
+      cached.isEdited = true;
+    }
+    if (currentRoom && currentRoom.messages) {
+      const rm = currentRoom.messages.find((m) => m.id === messageId);
+      if (rm) {
+        rm.text = newText;
+        rm.isEdited = true;
+      }
+    }
     const row = document.getElementById(`msg-el-${messageId}`);
     if (row) {
       const bubble = row.querySelector('.leading-relaxed');
       if (bubble) {
-        bubble.innerHTML = `${escapeHtml(newText)} <span class="text-[10px] opacity-75 ml-1.5 font-normal">(수정됨)</span>`;
+        bubble.innerHTML = `${formatMessageText(newText)} <span class="text-[10px] opacity-75 ml-1.5 font-normal">(수정됨)</span>`;
       }
     }
   }
@@ -2110,6 +2361,10 @@ socket.on('message_edited', ({ roomId, messageId, newText, editedAt }) => {
 
 socket.on('message_deleted', ({ roomId, messageId }) => {
   if (roomId === currentRoomId) {
+    allMessagesMap.delete(messageId);
+    if (currentRoom && currentRoom.messages) {
+      currentRoom.messages = currentRoom.messages.filter((m) => m.id !== messageId);
+    }
     const row = document.getElementById(`msg-el-${messageId}`);
     if (row) {
       row.remove(); // 화면에서 흔적도 없이 완전 삭제
