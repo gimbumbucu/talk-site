@@ -386,7 +386,6 @@ const btnStartVideoCall = document.getElementById('btn-start-video-call');
 const messagesContainer = document.getElementById('messages-container');
 const messageForm = document.getElementById('message-form');
 const messageInput = document.getElementById('message-input');
-const toggleSilentSend = document.getElementById('toggle-silent-send');
 const editModeIndicator = document.getElementById('edit-mode-indicator');
 const btnCancelEdit = document.getElementById('btn-cancel-edit');
 const btnSendText = document.getElementById('btn-send-text');
@@ -1806,7 +1805,7 @@ messageForm.addEventListener('submit', async (e) => {
     }
 
     // /silent, /slient, /무음, /조용히 명령어 체크
-    let isSilent = toggleSilentSend.checked;
+    let isSilent = false;
     const silentMatch = text.match(/^\/(?:silent|slient|무음|조용히)\s*(.*)/i);
     if (silentMatch) {
       isSilent = true;
