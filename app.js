@@ -410,6 +410,10 @@ const replyTargetName = document.getElementById('reply-target-name');
 const replyTargetText = document.getElementById('reply-target-text');
 const btnCancelReply = document.getElementById('btn-cancel-reply');
 
+// 슬래시 명령어 자동완성 팝업 DOM
+const slashCommandsPopup = document.getElementById('slash-commands-popup');
+const slashCommandsList = document.getElementById('slash-commands-list');
+
 // 인스타그램 스타일 그리기 모달 DOM
 const btnOpenDrawModal = document.getElementById('btn-open-draw-modal');
 const drawModal = document.getElementById('draw-modal');
@@ -473,11 +477,116 @@ const activeTypingUsers = new Map(); // username -> { username, displayName, ava
 
 // ==================== 초기 설정 및 이벤트 리스너 ====================
 window.addEventListener('DOMContentLoaded', () => {
+  // 슬래시 명령어 목록 (현재는 silent만)
+  const slashCommands = [
+    {
+      name: 'silent',
+      aliases: ['slient', '무음', '조용히'],
+      icon: 'fa-solid fa-bell-slash text-blue-500',
+      title: '/silent',
+      desc: '알림음/진동 없이 조용히 메시지 전송'
+    }
+  ];
+
+  let selectedCommandIndex = 0;
+  let filteredCommands = [];
+
+  function checkSlashCommands() {
+    if (!messageInput || !slashCommandsPopup) return;
+    const val = messageInput.value;
+
+    // '/'로 시작하고 뒤에 공백이 아직 안 들어간 상태면 팝업 표시
+    if (val.startsWith('/') && !val.includes(' ')) {
+      const query = val.slice(1).trim().toLowerCase();
+      filteredCommands = slashCommands.filter((cmd) => {
+        if (!query) return true;
+        if (cmd.name.toLowerCase().startsWith(query)) return true;
+        return cmd.aliases.some((a) => a.toLowerCase().startsWith(query));
+      });
+
+      if (filteredCommands.length > 0) {
+        selectedCommandIndex = 0;
+        renderSlashCommandsList();
+        slashCommandsPopup.classList.remove('hidden');
+        return;
+      }
+    }
+    closeSlashCommands();
+  }
+
+  function renderSlashCommandsList() {
+    if (!slashCommandsList) return;
+    slashCommandsList.innerHTML = '';
+    filteredCommands.forEach((cmd, idx) => {
+      const item = document.createElement('div');
+      item.className = `command-item ${idx === selectedCommandIndex ? 'selected' : ''}`;
+      item.innerHTML = `
+        <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 text-sm">
+          <i class="${cmd.icon}"></i>
+        </div>
+        <div class="truncate flex-1">
+          <div class="text-xs font-bold text-slate-800 command-name">${cmd.title}</div>
+          <div class="text-[11px] text-slate-500 truncate">${cmd.desc}</div>
+        </div>
+      `;
+
+      item.addEventListener('click', () => {
+        applySlashCommand(cmd);
+      });
+
+      slashCommandsList.appendChild(item);
+    });
+  }
+
+  function applySlashCommand(cmd) {
+    messageInput.value = `/${cmd.name} `;
+    closeSlashCommands();
+    messageInput.focus();
+  }
+
+  function closeSlashCommands() {
+    if (slashCommandsPopup) slashCommandsPopup.classList.add('hidden');
+  }
+
+  document.addEventListener('click', (e) => {
+    if (slashCommandsPopup && !slashCommandsPopup.contains(e.target) && e.target !== messageInput) {
+      closeSlashCommands();
+    }
+  });
+
   // 모바일 및 브라우저 엔터 전송 시 화면 위아래 반동(바운스) 원천 차단
   messageInput.addEventListener('keydown', (e) => {
     if (e.isComposing || e.keyCode === 229) return; // 한글 조합 중일 때는 무시
+
+    // 슬래시 팝업이 열려있을 때 방향키/Enter/Tab 처리
+    if (slashCommandsPopup && !slashCommandsPopup.classList.contains('hidden') && filteredCommands.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedCommandIndex = (selectedCommandIndex + 1) % filteredCommands.length;
+        renderSlashCommandsList();
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedCommandIndex = (selectedCommandIndex - 1 + filteredCommands.length) % filteredCommands.length;
+        renderSlashCommandsList();
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        applySlashCommand(filteredCommands[selectedCommandIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSlashCommands();
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      closeSlashCommands();
       // submit 이벤트 직접 디스패치
       if (typeof messageForm.requestSubmit === 'function') {
         messageForm.requestSubmit();
@@ -487,8 +596,10 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 실시간 타이핑 감지 (상대방에게 챗 치고 있음을 알림)
+  // 실시간 타이핑 감지 및 슬래시 명령어 자동완성 체크
   messageInput.addEventListener('input', () => {
+    checkSlashCommands();
+
     if (messageInput.value.trim().length > 0) {
       startMyTyping();
     } else {
