@@ -354,6 +354,44 @@ del.chat-strike {
   border-color: #ffffff;
 }
 
+/* 인스타/iMessage 스타일 실시간 타이핑 말풍선 점박이 애니메이션 */
+.typing-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 14px;
+  background-color: #ffffff;
+  border-radius: 1.25rem;
+  border-bottom-left-radius: 0.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid #f1f5f9;
+}
+
+.typing-dot {
+  display: inline-block;
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 50%;
+  background-color: #94a3b8;
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+.typing-dot:nth-child(3) { animation-delay: 0s; }
+
+@keyframes typingBounce {
+  0%, 80%, 100% {
+    transform: scale(0.65);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.15);
+    opacity: 1;
+    background-color: #3b82f6;
+  }
+}
+
 
 /* 이모티콘 피커 */
 #emoji-picker-panel {
@@ -473,4 +511,42 @@ del.chat-strike {
   transform: scale(1.25);
   box-shadow: 0 0 0 2.5px #ffffff;
   border-color: #ffffff;
+}
+
+/* 인스타/iMessage 스타일 실시간 타이핑 말풍선 점박이 애니메이션 */
+.typing-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 14px;
+  background-color: #ffffff;
+  border-radius: 1.25rem;
+  border-bottom-left-radius: 0.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid #f1f5f9;
+}
+
+.typing-dot {
+  display: inline-block;
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 50%;
+  background-color: #94a3b8;
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+.typing-dot:nth-child(3) { animation-delay: 0s; }
+
+@keyframes typingBounce {
+  0%, 80%, 100% {
+    transform: scale(0.65);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.15);
+    opacity: 1;
+    background-color: #3b82f6;
+  }
 }

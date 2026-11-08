@@ -467,6 +467,11 @@ let pendingIncomingCall = null;
 let isCallConnectingOrActive = false; // 통화 연결 중 또는 통화 중 상태 플래그
 let isRingtonePlaying = false; // 벨소리 재생 상태 플래그
 
+// 실시간 타이핑 인디케이터 상태
+let myTypingTimer = null;
+let isMyTypingActive = false;
+const activeTypingUsers = new Map(); // username -> { username, displayName, avatarUrl }
+
 // ==================== 초기 설정 및 이벤트 리스너 ====================
 window.addEventListener('DOMContentLoaded', () => {
   // 모바일 및 브라우저 엔터 전송 시 화면 위아래 반동(바운스) 원천 차단
@@ -481,6 +486,19 @@ window.addEventListener('DOMContentLoaded', () => {
         messageForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
       }
     }
+  });
+
+  // 실시간 타이핑 감지 (상대방에게 챗 치고 있음을 알림)
+  messageInput.addEventListener('input', () => {
+    if (messageInput.value.trim().length > 0) {
+      startMyTyping();
+    } else {
+      stopMyTyping();
+    }
+  });
+
+  messageInput.addEventListener('blur', () => {
+    stopMyTyping();
   });
 
   // 모바일 가상 키보드 팝업 시 입력창 및 대화창 높이 완벽 동기화
@@ -1475,6 +1493,9 @@ function selectRoom(roomId, roomName, type, targetUsername = null) {
   cancelEditMode();
   cancelReplyMode();
   clearSelectedMedia();
+  stopMyTyping();
+  activeTypingUsers.clear();
+  renderTypingIndicator();
 }
 
 function startDirectMessage(targetUsername) {
@@ -1801,6 +1822,8 @@ messageForm.addEventListener('submit', async (e) => {
       fileType: replyingToMessage.fileType || null
     } : null;
 
+    stopMyTyping();
+
     socket.emit('send_message', {
       roomId: currentRoomId,
       text,
@@ -1816,6 +1839,7 @@ messageForm.addEventListener('submit', async (e) => {
         messageInput.value = '';
         clearSelectedMedia();
         cancelReplyMode();
+        stopMyTyping();
         if (window.innerWidth >= 768 && document.activeElement !== messageInput) {
           messageInput.focus();
         }
@@ -1867,10 +1891,82 @@ window.deleteMessage = function(messageId) {
   });
 };
 
+// ==================== 실시간 타이핑 인디케이터 ====================
+function startMyTyping() {
+  if (!isMyTypingActive && socket && socket.connected) {
+    isMyTypingActive = true;
+    socket.emit('typing_start', { roomId: currentRoomId });
+  }
+  clearTimeout(myTypingTimer);
+  myTypingTimer = setTimeout(() => {
+    stopMyTyping();
+  }, 2500);
+}
+
+function stopMyTyping() {
+  clearTimeout(myTypingTimer);
+  if (isMyTypingActive && socket && socket.connected) {
+    isMyTypingActive = false;
+    socket.emit('typing_stop', { roomId: currentRoomId });
+  }
+}
+
+function renderTypingIndicator() {
+  let typingEl = document.getElementById('typing-indicator-row');
+
+  if (activeTypingUsers.size === 0) {
+    if (typingEl) typingEl.remove();
+    return;
+  }
+
+  const typingUser = Array.from(activeTypingUsers.values())[0];
+  const dispName = escapeHtml(typingUser.displayName || typingUser.username);
+  const avatarHtml = getAvatarElement(typingUser.avatarUrl, dispName, 'w-8 h-8 text-xs mr-2');
+
+  if (!typingEl) {
+    typingEl = document.createElement('div');
+    typingEl.id = 'typing-indicator-row';
+    typingEl.className = 'message-row other-message my-1.5 transition-all duration-200';
+    messagesContainer.appendChild(typingEl);
+  }
+
+  typingEl.innerHTML = `
+    ${avatarHtml}
+    <div>
+      <div class="text-[11px] text-slate-400 font-medium mb-1">${dispName}님이 입력 중...</div>
+      <div class="typing-bubble">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>
+    </div>
+  `;
+
+  scrollToBottom(true);
+}
+
 // ==================== 5. 소켓 이벤트 수신 ====================
+
+socket.on('user_typing_start', ({ roomId, username, displayName, avatarUrl }) => {
+  if (roomId !== currentRoomId) return;
+  if (currentUser && username === currentUser.username) return;
+
+  activeTypingUsers.set(username, { username, displayName, avatarUrl });
+  renderTypingIndicator();
+});
+
+socket.on('user_typing_stop', ({ roomId, username }) => {
+  if (roomId !== currentRoomId) return;
+  activeTypingUsers.delete(username);
+  renderTypingIndicator();
+});
 
 socket.on('new_message', (msg) => {
   if (msg.roomId === currentRoomId) {
+    // 새 메시지가 오면 상대방의 타이핑 표시 즉시 제거
+    activeTypingUsers.delete(msg.senderName);
+    renderTypingIndicator();
+
     appendMessage(msg, true);
     if (document.hasFocus() && currentUser && msg.senderName !== currentUser.username) {
       socket.emit('mark_read', { roomId: currentRoomId });

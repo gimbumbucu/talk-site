@@ -180,11 +180,12 @@
           <div class="flex items-center gap-2 truncate">
             <i class="fa-solid fa-reply text-blue-600 shrink-0"></i>
             <div class="truncate">
-              <span id="reply-target-name" class="font-bold text-blue-700"></span>에게 답장: 
+              <span id="reply-target-name" class="font-bold text-blue-700"></span>에게 답장:
               <span id="reply-target-text" class="text-slate-600 font-normal"></span>
             </div>
           </div>
-          <button type="button" id="btn-cancel-reply" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg shrink-0">
+          <button type="button" id="btn-cancel-reply"
+            class="text-slate-400 hover:text-slate-700 p-1 rounded-lg shrink-0">
             <i class="fa-solid fa-xmark text-sm"></i>
           </button>
         </div>
@@ -193,7 +194,8 @@
         <div id="image-preview-bar"
           class="hidden mb-2 p-2 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-between">
           <div class="flex items-center space-x-2.5 min-w-0">
-            <div id="image-preview-thumb-container" class="w-10 h-10 rounded-lg overflow-hidden border border-slate-300 shrink-0 flex items-center justify-center bg-slate-200">
+            <div id="image-preview-thumb-container"
+              class="w-10 h-10 rounded-lg overflow-hidden border border-slate-300 shrink-0 flex items-center justify-center bg-slate-200">
               <img id="image-preview-thumb" src="" alt="미리보기" class="w-full h-full object-cover">
               <i id="video-preview-icon" class="fa-solid fa-video text-slate-500 hidden text-base"></i>
             </div>
@@ -235,7 +237,8 @@
                 <!-- 2. 사진 찍기 -->
                 <label for="camera-photo-input"
                   class="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-100 rounded-xl cursor-pointer text-slate-700 text-xs font-semibold transition">
-                  <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <span
+                    class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                     <i class="fa-solid fa-camera"></i>
                   </span>
                   <span>사진 찍기</span>
@@ -255,7 +258,8 @@
                 <!-- 4. 인스타 그리기 -->
                 <button type="button" id="btn-open-draw-modal"
                   class="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-100 rounded-xl cursor-pointer text-slate-700 text-xs font-semibold transition w-full text-left">
-                  <span class="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center shrink-0">
+                  <span
+                    class="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center shrink-0">
                     <i class="fa-solid fa-paintbrush"></i>
                   </span>
                   <span>그리기</span>
@@ -620,7 +624,8 @@
     </div>
 
     <!-- 캔버스 영역 -->
-    <div class="flex-1 w-full max-w-lg flex items-center justify-center relative my-2 overflow-hidden rounded-3xl border border-white/15 bg-slate-950 shadow-2xl">
+    <div
+      class="flex-1 w-full max-w-lg flex items-center justify-center relative my-2 overflow-hidden rounded-3xl border border-white/15 bg-slate-950 shadow-2xl">
       <canvas id="drawing-canvas" class="w-full h-full touch-none cursor-crosshair block"></canvas>
     </div>
 
@@ -629,7 +634,8 @@
       <div class="flex items-center justify-between gap-4 px-2">
         <div class="flex items-center gap-2 flex-1">
           <span class="text-white/80 text-xs shrink-0"><i class="fa-solid fa-pen-nib"></i></span>
-          <input type="range" id="draw-line-width" min="2" max="36" value="6" class="w-full accent-rose-500 cursor-pointer">
+          <input type="range" id="draw-line-width" min="2" max="36" value="6"
+            class="w-full accent-rose-500 cursor-pointer">
         </div>
         <button type="button" id="btn-eraser-mode"
           class="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition shrink-0">
@@ -638,7 +644,8 @@
       </div>
 
       <!-- 색상 팔레트 -->
-      <div class="flex items-center justify-center gap-2.5 overflow-x-auto py-1 px-1 no-scrollbar" id="color-palette"></div>
+      <div class="flex items-center justify-center gap-2.5 overflow-x-auto py-1 px-1 no-scrollbar" id="color-palette">
+      </div>
     </div>
   </div>
 
