@@ -1932,13 +1932,10 @@ function renderTypingIndicator() {
 
   typingEl.innerHTML = `
     ${avatarHtml}
-    <div>
-      <div class="text-[11px] text-slate-400 font-medium mb-1">${dispName}님이 입력 중...</div>
-      <div class="typing-bubble">
-        <span class="typing-dot"></span>
-        <span class="typing-dot"></span>
-        <span class="typing-dot"></span>
-      </div>
+    <div class="message-bubble bg-white text-slate-700 py-2.5 px-3.5 rounded-2xl shadow-xs border border-slate-100 flex items-center gap-1.5 w-fit">
+      <span class="typing-dot"></span>
+      <span class="typing-dot"></span>
+      <span class="typing-dot"></span>
     </div>
   `;
 
