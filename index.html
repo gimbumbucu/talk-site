@@ -270,12 +270,12 @@
             <div class="relative flex-1">
               <!-- 슬래시 명령어 자동완성 팝업 -->
               <div id="slash-commands-popup"
-                class="hidden absolute bottom-12 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl shadow-xl p-2 max-w-sm">
-                <div class="text-[11px] font-bold text-slate-400 px-2 py-1 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 pb-1.5 mb-1">
-                  <span>명령어 목록</span>
+                class="hidden absolute bottom-14 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl shadow-2xl p-2.5 max-w-md w-full">
+                <div class="text-[11px] font-bold text-slate-400 px-2 py-1 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 pb-1.5 mb-1.5">
+                  <span class="flex items-center gap-1.5"><i class="fa-solid fa-terminal text-blue-500"></i> 명령어 목록</span>
                   <span class="text-[10px] font-normal text-slate-400">클릭 또는 Tab/Enter</span>
                 </div>
-                <div id="slash-commands-list" class="flex flex-col gap-1 max-h-48 overflow-y-auto"></div>
+                <div id="slash-commands-list" class="flex flex-col gap-1.5 max-h-56 overflow-y-auto"></div>
               </div>
 
               <input type="text" id="message-input" autocomplete="off" placeholder="메시지 입력..."

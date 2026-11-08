@@ -477,14 +477,16 @@ const activeTypingUsers = new Map(); // username -> { username, displayName, ava
 
 // ==================== 초기 설정 및 이벤트 리스너 ====================
 window.addEventListener('DOMContentLoaded', () => {
-  // 슬래시 명령어 목록 (현재는 silent만)
+  // 슬래시 명령어 목록 및 상세 설명
   const slashCommands = [
     {
       name: 'silent',
       aliases: ['slient', '무음', '조용히'],
-      icon: 'fa-solid fa-bell-slash text-blue-500',
+      icon: 'fa-solid fa-bell-slash text-blue-600',
       title: '/silent',
-      desc: '알림음/진동 없이 조용히 메시지 전송'
+      label: '무음 전송',
+      desc: '상대방에게 알림음/진동 없이 조용히 메시지를 보냅니다.',
+      hint: '예: /silent 자는 중이면 나중에 확인해!'
     }
   ];
 
@@ -521,12 +523,16 @@ window.addEventListener('DOMContentLoaded', () => {
       const item = document.createElement('div');
       item.className = `command-item ${idx === selectedCommandIndex ? 'selected' : ''}`;
       item.innerHTML = `
-        <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 text-sm">
+        <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 text-sm">
           <i class="${cmd.icon}"></i>
         </div>
-        <div class="truncate flex-1">
-          <div class="text-xs font-bold text-slate-800 command-name">${cmd.title}</div>
-          <div class="text-[11px] text-slate-500 truncate">${cmd.desc}</div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5 mb-0.5">
+            <span class="text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md command-name">${cmd.title}</span>
+            <span class="text-[11px] font-semibold text-slate-700">${cmd.label}</span>
+          </div>
+          <div class="text-xs text-slate-600 leading-snug">${cmd.desc}</div>
+          <div class="text-[11px] text-slate-400 mt-0.5 font-mono">${cmd.hint}</div>
         </div>
       `;
 
