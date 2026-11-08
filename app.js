@@ -1313,19 +1313,18 @@ function openContextMenu(msg, clientX, clientY) {
   activeContextMsg = msg;
   const isMy = currentUser && msg.senderName === currentUser.username;
 
-  // 내 메시지: [답장, 복사, 수정(텍스트만), 삭제]
-  // 상대방 메시지: [답장, 복사]만 표시
-  if (ctxBtnEdit) {
-    ctxBtnEdit.style.display = (isMy && !msg.fileUrl && !msg.isDeleted) ? 'flex' : 'none';
-  }
-  if (ctxBtnDelete) {
-    ctxBtnDelete.style.display = (isMy && !msg.isDeleted) ? 'flex' : 'none';
-  }
+  // 꾹 누르면: [답장, 복사, 수정, 삭제] 표시
   if (ctxBtnReply) {
     ctxBtnReply.style.display = msg.isDeleted ? 'none' : 'flex';
   }
   if (ctxBtnCopy) {
     ctxBtnCopy.style.display = msg.isDeleted ? 'none' : 'flex';
+  }
+  if (ctxBtnEdit) {
+    ctxBtnEdit.style.display = (isMy && !msg.fileUrl && !msg.isDeleted) ? 'flex' : 'none';
+  }
+  if (ctxBtnDelete) {
+    ctxBtnDelete.style.display = msg.isDeleted ? 'none' : 'flex';
   }
 
   if (messageContextBackdrop) messageContextBackdrop.classList.remove('hidden');
@@ -1964,24 +1963,24 @@ function appendMessage(msg, scroll = true) {
     `;
   }
 
-  // 꾹 누르기 (Long Press: 카카오톡/인스타그램 스타일) 및 우클릭 메뉴
+  // 꾹 누르기 (Long Press: 모바일 터치 및 PC 마우스 클릭 유지)
   if (!msg.isDeleted) {
     let longPressTimer = null;
-    let touchStartX = 0;
-    let touchStartY = 0;
+    let startX = 0;
+    let startY = 0;
     let isLongPressed = false;
 
     const startPress = (x, y) => {
       isLongPressed = false;
-      touchStartX = x;
-      touchStartY = y;
+      startX = x;
+      startY = y;
       longPressTimer = setTimeout(() => {
         isLongPressed = true;
         if ('vibrate' in navigator) {
           try { navigator.vibrate(40); } catch (e) {}
         }
-        openContextMenu(msg, touchStartX, touchStartY);
-      }, 400);
+        openContextMenu(msg, startX, startY);
+      }, 320); // 320ms 꾹 누르면 실행
     };
 
     const cancelPress = () => {
@@ -1991,6 +1990,7 @@ function appendMessage(msg, scroll = true) {
       }
     };
 
+    // 1) 모바일 터치 (touchstart, touchmove, touchend)
     row.addEventListener('touchstart', (e) => {
       if (e.target.closest('video') || e.target.closest('a') || e.target.closest('button')) return;
       const touch = e.touches[0];
@@ -2001,7 +2001,7 @@ function appendMessage(msg, scroll = true) {
 
     row.addEventListener('touchmove', (e) => {
       const touch = e.touches[0];
-      if (touch && (Math.abs(touch.clientX - touchStartX) > 10 || Math.abs(touch.clientY - touchStartY) > 10)) {
+      if (touch && (Math.abs(touch.clientX - startX) > 10 || Math.abs(touch.clientY - startY) > 10)) {
         cancelPress();
       }
     }, { passive: true });
@@ -2016,7 +2016,24 @@ function appendMessage(msg, scroll = true) {
 
     row.addEventListener('touchcancel', cancelPress);
 
-    // PC 마우스 우클릭 (contextmenu)
+    // 2) PC 마우스 좌클릭 길게 누르기 (mousedown, mousemove, mouseup)
+    row.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return; // 좌클릭만
+      if (e.target.closest('video') || e.target.closest('a') || e.target.closest('button')) return;
+      startPress(e.clientX, e.clientY);
+    });
+
+    row.addEventListener('mousemove', (e) => {
+      if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) {
+        cancelPress();
+      }
+    });
+
+    row.addEventListener('mouseup', () => {
+      cancelPress();
+    });
+
+    // 3) PC 마우스 우클릭 (contextmenu)
     row.addEventListener('contextmenu', (e) => {
       if (e.target.closest('video') || e.target.closest('a') || e.target.closest('button')) return;
       e.preventDefault();
@@ -2224,16 +2241,29 @@ window.addEventListener('keydown', (e) => {
 
 // 메시지 삭제
 window.deleteMessage = function(messageId) {
-  if (!confirm('이 메시지(사진)를 정말 삭제하시겠습니까?')) return;
+  if (!confirm('이 메시지를 정말 삭제하시겠습니까?')) return;
+  const msg = allMessagesMap.get(messageId) || (currentRoom && currentRoom.messages ? currentRoom.messages.find(m => m.id === messageId) : null);
+  const isMy = currentUser && msg && msg.senderName === currentUser.username;
 
-  socket.emit('delete_message', {
-    roomId: currentRoomId,
-    messageId
-  }, (res) => {
-    if (!res.success) {
-      alert(res.message || '삭제 실패');
+  if (isMy) {
+    socket.emit('delete_message', {
+      roomId: currentRoomId,
+      messageId
+    }, (res) => {
+      if (!res.success) {
+        alert(res.message || '삭제 실패');
+      }
+    });
+  } else {
+    // 상대방 메시지도 내 화면에서 즉시 삭제
+    const row = document.getElementById(`msg-el-${messageId}`);
+    if (row) row.remove();
+    allMessagesMap.delete(messageId);
+    if (currentRoom && currentRoom.messages) {
+      currentRoom.messages = currentRoom.messages.filter(m => m.id !== messageId);
     }
-  });
+    showToast({ title: '메시지가 삭제되었습니다.', body: '', isSilent: true });
+  }
 };
 
 // ==================== 실시간 타이핑 인디케이터 ====================

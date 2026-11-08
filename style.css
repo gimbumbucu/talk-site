@@ -176,6 +176,21 @@ body {
   }
 }
 
+/* 단일 클릭/호버 시 뜨던 구버전 message-actions 원천 차단 */
+.message-actions,
+.message-row:hover .message-actions,
+.message-row.active .message-actions,
+.message-action-btn {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
 .deleted-message {
   font-style: italic;
   color: #94a3b8 !important;
