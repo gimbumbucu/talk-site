@@ -174,12 +174,29 @@
           </button>
         </div>
 
-        <!-- 사진 미리보기 바 -->
+        <!-- 답장 모드 바 -->
+        <div id="reply-mode-indicator"
+          class="hidden mb-2 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-900 rounded-xl text-xs flex items-center justify-between shadow-xs">
+          <div class="flex items-center gap-2 truncate">
+            <i class="fa-solid fa-reply text-blue-600 shrink-0"></i>
+            <div class="truncate">
+              <span id="reply-target-name" class="font-bold text-blue-700"></span>에게 답장: 
+              <span id="reply-target-text" class="text-slate-600 font-normal"></span>
+            </div>
+          </div>
+          <button type="button" id="btn-cancel-reply" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg shrink-0">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <!-- 미디어 미리보기 바 (사진/동영상) -->
         <div id="image-preview-bar"
           class="hidden mb-2 p-2 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-between">
           <div class="flex items-center space-x-2.5 min-w-0">
-            <img id="image-preview-thumb" src="" alt="미리보기"
-              class="w-10 h-10 object-cover rounded-lg border border-slate-300 shrink-0">
+            <div id="image-preview-thumb-container" class="w-10 h-10 rounded-lg overflow-hidden border border-slate-300 shrink-0 flex items-center justify-center bg-slate-200">
+              <img id="image-preview-thumb" src="" alt="미리보기" class="w-full h-full object-cover">
+              <i id="video-preview-icon" class="fa-solid fa-video text-slate-500 hidden text-base"></i>
+            </div>
             <div class="truncate">
               <div id="image-preview-name" class="text-xs font-bold text-slate-700 truncate max-w-[180px]">파일명.jpg</div>
               <div id="image-preview-size" class="text-[10px] text-slate-400">0 KB</div>
@@ -187,21 +204,67 @@
           </div>
           <button type="button" id="btn-remove-image"
             class="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-white transition shrink-0"
-            title="사진 제거">
+            title="파일 제거">
             <i class="fa-solid fa-xmark text-sm"></i>
           </button>
         </div>
 
         <form id="message-form" class="space-y-1.5">
-          <div class="flex items-center gap-1.5">
-            <label for="image-upload-input"
-              class="w-10 h-10 text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-xl cursor-pointer transition flex items-center justify-center shrink-0">
-              <i class="fa-regular fa-image text-base"></i>
-              <input type="file" id="image-upload-input" accept="image/*" class="hidden">
-            </label>
+          <div class="flex items-center gap-1.5 relative">
+            <!-- + 플러스 메뉴 버튼 & 팝업 -->
+            <div class="relative">
+              <button type="button" id="btn-attach-menu"
+                class="w-10 h-10 text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 rounded-xl cursor-pointer transition flex items-center justify-center shrink-0"
+                title="사진/카메라/그리기">
+                <i class="fa-solid fa-plus text-base transition-transform duration-200" id="attach-plus-icon"></i>
+              </button>
+
+              <!-- 인스타 스타일 액션 팝업 메뉴 -->
+              <div id="attach-popup-menu"
+                class="hidden absolute bottom-12 left-0 z-40 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 w-48 flex flex-col gap-1 backdrop-blur-md">
+                <!-- 1. 사진 / 앨범 -->
+                <label for="image-upload-input"
+                  class="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-100 rounded-xl cursor-pointer text-slate-700 text-xs font-semibold transition">
+                  <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <i class="fa-regular fa-image"></i>
+                  </span>
+                  <span>사진 / 앨범</span>
+                  <input type="file" id="image-upload-input" accept="image/*,video/*" class="hidden">
+                </label>
+
+                <!-- 2. 사진 찍기 -->
+                <label for="camera-photo-input"
+                  class="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-100 rounded-xl cursor-pointer text-slate-700 text-xs font-semibold transition">
+                  <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-camera"></i>
+                  </span>
+                  <span>사진 찍기</span>
+                  <input type="file" id="camera-photo-input" accept="image/*" capture="environment" class="hidden">
+                </label>
+
+                <!-- 3. 동영상 촬영 -->
+                <label for="camera-video-input"
+                  class="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-100 rounded-xl cursor-pointer text-slate-700 text-xs font-semibold transition">
+                  <span class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-video"></i>
+                  </span>
+                  <span>동영상 촬영</span>
+                  <input type="file" id="camera-video-input" accept="video/*" capture="environment" class="hidden">
+                </label>
+
+                <!-- 4. 인스타 그리기 -->
+                <button type="button" id="btn-open-draw-modal"
+                  class="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-100 rounded-xl cursor-pointer text-slate-700 text-xs font-semibold transition w-full text-left">
+                  <span class="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-paintbrush"></i>
+                  </span>
+                  <span>그리기</span>
+                </button>
+              </div>
+            </div>
 
             <div class="relative flex-1">
-              <input type="text" id="message-input" autocomplete="off" placeholder="메시지 입력..."
+              <input type="text" id="message-input" autocomplete="off" placeholder="메시지 입력... (/silent: 무음, ~~취소선~~)"
                 class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
             </div>
 
@@ -219,6 +282,11 @@
                 <i class="fa-solid fa-bell-slash text-slate-400"></i> 무음 전송
               </span>
             </label>
+            <div class="text-[11px] text-slate-400 flex items-center gap-2">
+              <span class="hidden sm:inline">/silent 로 무음 전송</span>
+              <span>~~취소선~~</span>
+              <span>**굵게**</span>
+            </div>
           </div>
         </form>
       </div>
@@ -524,6 +592,53 @@
           <i class="fa-solid fa-download"></i> 다운로드
         </a>
       </div>
+    </div>
+  </div>
+
+  <!-- 인스타그램 스타일 그리기 모달 -->
+  <div id="draw-modal"
+    class="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex flex-col items-center justify-between p-3 sm:p-5 select-none hidden">
+    <!-- 모달 상단 툴바 -->
+    <div class="w-full max-w-lg flex items-center justify-between text-white py-1 shrink-0">
+      <button type="button" id="btn-close-draw" class="text-white hover:text-slate-300 p-2 text-xl" title="닫기">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <div class="flex items-center gap-2">
+        <button type="button" id="btn-undo-draw"
+          class="text-white hover:text-slate-200 px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 rounded-xl flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-rotate-left"></i> 되돌리기
+        </button>
+        <button type="button" id="btn-clear-draw"
+          class="text-rose-300 hover:text-rose-100 px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-rose-500/20 rounded-xl flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-trash-can"></i> 지우기
+        </button>
+      </div>
+      <button type="button" id="btn-finish-draw"
+        class="px-5 py-2 bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 hover:opacity-90 active:scale-95 text-white rounded-full text-xs font-bold shadow-lg transition">
+        완료
+      </button>
+    </div>
+
+    <!-- 캔버스 영역 -->
+    <div class="flex-1 w-full max-w-lg flex items-center justify-center relative my-2 overflow-hidden rounded-3xl border border-white/15 bg-slate-950 shadow-2xl">
+      <canvas id="drawing-canvas" class="w-full h-full touch-none cursor-crosshair block"></canvas>
+    </div>
+
+    <!-- 하단 브러시 & 색상 팔레트 -->
+    <div class="w-full max-w-lg flex flex-col gap-2.5 py-1 shrink-0">
+      <div class="flex items-center justify-between gap-4 px-2">
+        <div class="flex items-center gap-2 flex-1">
+          <span class="text-white/80 text-xs shrink-0"><i class="fa-solid fa-pen-nib"></i></span>
+          <input type="range" id="draw-line-width" min="2" max="36" value="6" class="w-full accent-rose-500 cursor-pointer">
+        </div>
+        <button type="button" id="btn-eraser-mode"
+          class="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 transition shrink-0">
+          <i class="fa-solid fa-eraser"></i> <span id="eraser-btn-text">지우개</span>
+        </button>
+      </div>
+
+      <!-- 색상 팔레트 -->
+      <div class="flex items-center justify-center gap-2.5 overflow-x-auto py-1 px-1 no-scrollbar" id="color-palette"></div>
     </div>
   </div>
 

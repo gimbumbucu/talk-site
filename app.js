@@ -188,7 +188,9 @@ let currentRoom = null;
 let currentTargetUsername = null; // 1:1 대화 상대 (김범서 또는 조민아)
 
 let editingMessageId = null;
-let selectedImageFile = null;
+let replyingToMessage = null; // 답장 대상 메시지
+let selectedMediaFile = null; // 첨부 사진/동영상 파일
+let selectedMediaType = 'image'; // 'image' | 'video'
 
 let isSilentModeEnabled = localStorage.getItem('chat_silent_mode') === 'true';
 
@@ -389,13 +391,38 @@ const editModeIndicator = document.getElementById('edit-mode-indicator');
 const btnCancelEdit = document.getElementById('btn-cancel-edit');
 const btnSendText = document.getElementById('btn-send-text');
 
-// 사진 첨부 DOM
+// 미디어 첨부 & 플러스 메뉴 DOM
+const btnAttachMenu = document.getElementById('btn-attach-menu');
+const attachPopupMenu = document.getElementById('attach-popup-menu');
+const attachPlusIcon = document.getElementById('attach-plus-icon');
 const imageUploadInput = document.getElementById('image-upload-input');
+const cameraPhotoInput = document.getElementById('camera-photo-input');
+const cameraVideoInput = document.getElementById('camera-video-input');
 const imagePreviewBar = document.getElementById('image-preview-bar');
 const imagePreviewThumb = document.getElementById('image-preview-thumb');
+const videoPreviewIcon = document.getElementById('video-preview-icon');
 const imagePreviewName = document.getElementById('image-preview-name');
 const imagePreviewSize = document.getElementById('image-preview-size');
 const btnRemoveImage = document.getElementById('btn-remove-image');
+
+// 답장 모드 DOM
+const replyModeIndicator = document.getElementById('reply-mode-indicator');
+const replyTargetName = document.getElementById('reply-target-name');
+const replyTargetText = document.getElementById('reply-target-text');
+const btnCancelReply = document.getElementById('btn-cancel-reply');
+
+// 인스타그램 스타일 그리기 모달 DOM
+const btnOpenDrawModal = document.getElementById('btn-open-draw-modal');
+const drawModal = document.getElementById('draw-modal');
+const btnCloseDraw = document.getElementById('btn-close-draw');
+const btnUndoDraw = document.getElementById('btn-undo-draw');
+const btnClearDraw = document.getElementById('btn-clear-draw');
+const btnFinishDraw = document.getElementById('btn-finish-draw');
+const drawingCanvas = document.getElementById('drawing-canvas');
+const drawLineWidth = document.getElementById('draw-line-width');
+const btnEraserMode = document.getElementById('btn-eraser-mode');
+const eraserBtnText = document.getElementById('eraser-btn-text');
+const colorPalette = document.getElementById('color-palette');
 
 // 라이트박스 DOM
 const lightboxModal = document.getElementById('lightbox-modal');
@@ -796,43 +823,409 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ==================== 사진 첨부 및 미리보기 ====================
-imageUploadInput.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (file) {
-    handleImageSelect(file);
-  }
-});
+// ==================== 미디어 첨부 (+ 메뉴) & 사진/동영상/그리기 ====================
+if (btnAttachMenu) {
+  btnAttachMenu.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isClosed = attachPopupMenu.classList.contains('hidden');
+    if (isClosed) {
+      attachPopupMenu.classList.remove('hidden');
+      attachPlusIcon.classList.add('rotate-45', 'text-rose-500');
+    } else {
+      closeAttachMenu();
+    }
+  });
 
-function handleImageSelect(file) {
-  if (!file.type.startsWith('image/')) {
-    alert('이미지 파일만 첨부할 수 있습니다.');
+  document.addEventListener('click', (e) => {
+    if (!attachPopupMenu.contains(e.target) && !btnAttachMenu.contains(e.target)) {
+      closeAttachMenu();
+    }
+  });
+}
+
+function closeAttachMenu() {
+  if (attachPopupMenu) {
+    attachPopupMenu.classList.add('hidden');
+  }
+  if (attachPlusIcon) {
+    attachPlusIcon.classList.remove('rotate-45', 'text-rose-500');
+  }
+}
+
+// 1. 사진/앨범 선택
+if (imageUploadInput) {
+  imageUploadInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) handleMediaSelect(file);
+    closeAttachMenu();
+  });
+}
+
+// 2. 사진 즉시 촬영
+if (cameraPhotoInput) {
+  cameraPhotoInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) handleMediaSelect(file);
+    closeAttachMenu();
+  });
+}
+
+// 3. 동영상 즉시 촬영
+if (cameraVideoInput) {
+  cameraVideoInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) handleMediaSelect(file);
+    closeAttachMenu();
+  });
+}
+
+function handleMediaSelect(file) {
+  const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
+  const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+
+  if (!isImage && !isVideo) {
+    alert('이미지 또는 동영상 파일만 첨부할 수 있습니다.');
     return;
   }
-  selectedImageFile = file;
 
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    imagePreviewThumb.src = e.target.result;
-    imagePreviewName.textContent = file.name || '사진_이미지.png';
-    imagePreviewSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+  selectedMediaFile = file;
+  selectedMediaType = isVideo ? 'video' : 'image';
+
+  if (isVideo) {
+    imagePreviewThumb.classList.add('hidden');
+    videoPreviewIcon.classList.remove('hidden');
+    imagePreviewName.textContent = file.name || '동영상_촬영.mp4';
+    const mbSize = (file.size / (1024 * 1024)).toFixed(1);
+    imagePreviewSize.textContent = mbSize > 0 ? `${mbSize} MB` : `${(file.size / 1024).toFixed(1)} KB`;
     imagePreviewBar.classList.remove('hidden');
-    if (window.innerWidth >= 768) {
-      messageInput.focus();
-    }
-  };
-  reader.readAsDataURL(file);
+  } else {
+    videoPreviewIcon.classList.add('hidden');
+    imagePreviewThumb.classList.remove('hidden');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      imagePreviewThumb.src = e.target.result;
+      imagePreviewName.textContent = file.name || '사진_이미지.png';
+      imagePreviewSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+      imagePreviewBar.classList.remove('hidden');
+      if (window.innerWidth >= 768) {
+        messageInput.focus();
+      }
+    };
+    reader.readAsDataURL(file);
+  }
 }
 
 btnRemoveImage.addEventListener('click', () => {
-  clearSelectedImage();
+  clearSelectedMedia();
 });
 
-function clearSelectedImage() {
-  selectedImageFile = null;
-  imageUploadInput.value = '';
+function clearSelectedMedia() {
+  selectedMediaFile = null;
+  selectedMediaType = 'image';
+  if (imageUploadInput) imageUploadInput.value = '';
+  if (cameraPhotoInput) cameraPhotoInput.value = '';
+  if (cameraVideoInput) cameraVideoInput.value = '';
   imagePreviewBar.classList.add('hidden');
   imagePreviewThumb.src = '';
+  videoPreviewIcon.classList.add('hidden');
+  imagePreviewThumb.classList.remove('hidden');
+}
+
+// ==================== 인스타그램 감성 그리기 (Canvas) ====================
+const drawColors = [
+  '#ffffff', // 흰색
+  '#000000', // 검정
+  '#ff3b30', // 레드
+  '#ff9500', // 오렌지
+  '#ffcc00', // 옐로우
+  '#34c759', // 그린
+  '#007aff', // 블루
+  '#5856d6', // 퍼플
+  '#ff2d55'  // 핫핑크
+];
+
+let drawCtx = null;
+let isDrawing = false;
+let currentDrawColor = '#ffffff';
+let isEraserMode = false;
+let drawHistory = [];
+
+function initDrawingCanvas() {
+  if (!drawingCanvas) return;
+  drawCtx = drawingCanvas.getContext('2d');
+
+  // 컬러 팔레트 생성
+  if (colorPalette && colorPalette.children.length === 0) {
+    drawColors.forEach((color, idx) => {
+      const dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = `draw-color-dot ${idx === 0 ? 'active' : ''}`;
+      dot.style.backgroundColor = color;
+      dot.addEventListener('click', () => {
+        isEraserMode = false;
+        currentDrawColor = color;
+        eraserBtnText.textContent = '지우개';
+        btnEraserMode.classList.remove('bg-rose-600', 'text-white');
+        btnEraserMode.classList.add('bg-white/10');
+        colorPalette.querySelectorAll('.draw-color-dot').forEach((d) => d.classList.remove('active'));
+        dot.classList.add('active');
+      });
+      colorPalette.appendChild(dot);
+    });
+  }
+
+  // 지우개 모드 토글
+  if (btnEraserMode) {
+    btnEraserMode.addEventListener('click', () => {
+      isEraserMode = !isEraserMode;
+      if (isEraserMode) {
+        eraserBtnText.textContent = '펜 모드';
+        btnEraserMode.classList.add('bg-rose-600', 'text-white');
+        btnEraserMode.classList.remove('bg-white/10');
+        colorPalette.querySelectorAll('.draw-color-dot').forEach((d) => d.classList.remove('active'));
+      } else {
+        eraserBtnText.textContent = '지우개';
+        btnEraserMode.classList.remove('bg-rose-600', 'text-white');
+        btnEraserMode.classList.add('bg-white/10');
+      }
+    });
+  }
+
+  // 되돌리기 (Undo)
+  if (btnUndoDraw) {
+    btnUndoDraw.addEventListener('click', () => {
+      if (drawHistory.length > 0) {
+        const lastState = drawHistory.pop();
+        const img = new Image();
+        img.onload = () => {
+          drawCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+          drawCtx.drawImage(img, 0, 0);
+        };
+        img.src = lastState;
+      } else {
+        drawCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+      }
+    });
+  }
+
+  // 전체 지우기
+  if (btnClearDraw) {
+    btnClearDraw.addEventListener('click', () => {
+      saveDrawState();
+      drawCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+    });
+  }
+
+  // 캔버스 마우스 & 터치 이벤트
+  const getCanvasCoords = (e) => {
+    const rect = drawingCanvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const scaleX = drawingCanvas.width / rect.width;
+    const scaleY = drawingCanvas.height / rect.height;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
+  };
+
+  const startDraw = (e) => {
+    e.preventDefault();
+    isDrawing = true;
+    saveDrawState();
+    const { x, y } = getCanvasCoords(e);
+    drawCtx.beginPath();
+    drawCtx.moveTo(x, y);
+    drawCtx.lineCap = 'round';
+    drawCtx.lineJoin = 'round';
+    drawCtx.lineWidth = Number(drawLineWidth?.value || 6);
+
+    if (isEraserMode) {
+      drawCtx.globalCompositeOperation = 'destination-out';
+      drawCtx.lineWidth = Number(drawLineWidth?.value || 6) * 2.5;
+    } else {
+      drawCtx.globalCompositeOperation = 'source-over';
+      drawCtx.strokeStyle = currentDrawColor;
+    }
+  };
+
+  const moveDraw = (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const { x, y } = getCanvasCoords(e);
+    drawCtx.lineTo(x, y);
+    drawCtx.stroke();
+  };
+
+  const stopDraw = (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+    isDrawing = false;
+    drawCtx.closePath();
+  };
+
+  drawingCanvas.addEventListener('mousedown', startDraw);
+  drawingCanvas.addEventListener('mousemove', moveDraw);
+  window.addEventListener('mouseup', stopDraw);
+
+  drawingCanvas.addEventListener('touchstart', startDraw, { passive: false });
+  drawingCanvas.addEventListener('touchmove', moveDraw, { passive: false });
+  window.addEventListener('touchend', stopDraw, { passive: false });
+}
+
+function saveDrawState() {
+  if (!drawingCanvas) return;
+  drawHistory.push(drawingCanvas.toDataURL());
+  if (drawHistory.length > 20) drawHistory.shift();
+}
+
+function resizeDrawCanvas() {
+  if (!drawingCanvas) return;
+  const container = drawingCanvas.parentElement;
+  if (!container) return;
+  const rect = container.getBoundingClientRect();
+  const width = Math.floor(rect.width) || 400;
+  const height = Math.floor(rect.height) || 500;
+
+  // 기존 그림 보존
+  let tempCanvas = null;
+  if (drawingCanvas.width > 0 && drawingCanvas.height > 0) {
+    tempCanvas = document.createElement('canvas');
+    tempCanvas.width = drawingCanvas.width;
+    tempCanvas.height = drawingCanvas.height;
+    tempCanvas.getContext('2d').drawImage(drawingCanvas, 0, 0);
+  }
+
+  drawingCanvas.width = width * (window.devicePixelRatio || 1);
+  drawingCanvas.height = height * (window.devicePixelRatio || 1);
+
+  if (tempCanvas && drawCtx) {
+    drawCtx.drawImage(tempCanvas, 0, 0, drawingCanvas.width, drawingCanvas.height);
+  }
+}
+
+// 그리기 모달 열기/닫기/완료
+if (btnOpenDrawModal) {
+  btnOpenDrawModal.addEventListener('click', () => {
+    closeAttachMenu();
+    drawModal.classList.remove('hidden');
+    initDrawingCanvas();
+    setTimeout(() => {
+      resizeDrawCanvas();
+    }, 100);
+  });
+}
+
+if (btnCloseDraw) {
+  btnCloseDraw.addEventListener('click', () => {
+    drawModal.classList.add('hidden');
+  });
+}
+
+if (btnFinishDraw) {
+  btnFinishDraw.addEventListener('click', () => {
+    if (!drawingCanvas) return;
+    // 캔버스를 이미지 Blob 파일로 변환하여 첨부
+    drawingCanvas.toBlob((blob) => {
+      if (blob) {
+        const drawFile = new File([blob], `draw_${Date.now()}.png`, { type: 'image/png' });
+        handleMediaSelect(drawFile);
+        drawModal.classList.add('hidden');
+        showToast({ title: '그림이 첨부되었습니다! 전송을 누르세요.', body: '', isSilent: true });
+      }
+    }, 'image/png');
+  });
+}
+
+// ==================== 답장 (Reply) & 복사 (Copy) ====================
+window.startReplyMessage = function(msgId) {
+  if (!currentRoom || !currentRoom.messages) return;
+  const targetMsg = currentRoom.messages.find((m) => m.id === msgId);
+  if (!targetMsg) return;
+
+  replyingToMessage = targetMsg;
+  const targetName = targetMsg.senderDisplayName || targetMsg.senderName || '상대방';
+  let targetSnippet = targetMsg.text;
+  if (!targetSnippet) {
+    targetSnippet = targetMsg.fileType === 'video' ? '[동영상]' : '[사진]';
+  }
+
+  replyTargetName.textContent = targetName;
+  replyTargetText.textContent = targetSnippet;
+  replyModeIndicator.classList.remove('hidden');
+
+  if (editingMessageId) cancelEditMode();
+  messageInput.focus();
+};
+
+window.cancelReplyMode = function() {
+  replyingToMessage = null;
+  if (replyModeIndicator) replyModeIndicator.classList.add('hidden');
+};
+
+if (btnCancelReply) {
+  btnCancelReply.addEventListener('click', cancelReplyMode);
+}
+
+// 메시지 복사
+window.copyMessageText = function(msgId) {
+  if (!currentRoom || !currentRoom.messages) return;
+  const targetMsg = currentRoom.messages.find((m) => m.id === msgId);
+  if (!targetMsg) return;
+
+  const textToCopy = targetMsg.text || targetMsg.fileUrl || '';
+  if (!textToCopy) return;
+
+  navigator.clipboard.writeText(textToCopy).then(() => {
+    showToast({ title: '메시지가 클립보드에 복사되었습니다.', body: '', isSilent: true });
+  }).catch(() => {
+    // 대체 복사
+    const tempInput = document.createElement('textarea');
+    tempInput.value = textToCopy;
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    document.execCommand('copy');
+    document.body.removeChild(tempInput);
+    showToast({ title: '메시지가 클립보드에 복사되었습니다.', body: '', isSilent: true });
+  });
+};
+
+// 답장 원본 메시지로 이동
+window.scrollToMessage = function(targetId) {
+  if (!targetId) return;
+  const el = document.getElementById(`msg-el-${targetId}`);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('highlight-message');
+    setTimeout(() => {
+      el.classList.remove('highlight-message');
+    }, 1500);
+  } else {
+    showToast({ title: '원본 메시지를 찾을 수 없습니다.', body: '', isSilent: true });
+  }
+};
+
+// 마크다운 텍스트 포맷팅 (취소선 ~~취소선~~, **굵게**, *기울임*, __밑줄__)
+function formatMessageText(text) {
+  if (!text) return '';
+  let formatted = escapeHtml(text);
+
+  // 1. 취소선: ~~텍스트~~
+  formatted = formatted.replace(/~~(.*?)~~/g, '<del class="chat-strike">$1</del>');
+
+  // 2. 굵게: **텍스트**
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>');
+
+  // 3. 기울임: *텍스트*
+  formatted = formatted.replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
+
+  // 4. 밑줄: __텍스트__
+  formatted = formatted.replace(/__(.*?)__/g, '<u class="underline">$1</u>');
+
+  // 5. 줄바꿈
+  formatted = formatted.replace(/\n/g, '<br>');
+
+  return formatted;
 }
 
 // 라이트박스
@@ -1080,7 +1473,8 @@ function selectRoom(roomId, roomName, type, targetUsername = null) {
   });
 
   cancelEditMode();
-  clearSelectedImage();
+  cancelReplyMode();
+  clearSelectedMedia();
 }
 
 function startDirectMessage(targetUsername) {
@@ -1157,17 +1551,44 @@ function appendMessage(msg, scroll = true) {
   // 수정됨 태그
   const editedTagHtml = msg.isEdited ? `<span class="text-[10px] opacity-75 ml-1.5 font-normal">(수정됨)</span>` : '';
 
-  // 수정/삭제 액션 버튼
-  let actionsHtml = '';
-  if (isMy && !msg.isDeleted) {
-    actionsHtml = `
-      <div class="message-actions">
-        ${!msg.fileUrl ? `<button class="message-action-btn edit-btn" onclick="startEditMessage('${msg.id}', '${encodeURIComponent(msg.text)}')"><i class="fa-solid fa-pen"></i> 수정</button>` : ''}
-        <button class="message-action-btn delete-btn" onclick="deleteMessage('${msg.id}')">
-          <i class="fa-solid fa-trash-can"></i> 삭제
-        </button>
+  // 답장 인용 박스 렌더링
+  let replyQuoteHtml = '';
+  if (msg.replyTo) {
+    const replySender = escapeHtml(msg.replyTo.senderDisplayName || msg.replyTo.senderName || '상대방');
+    const replySnippet = escapeHtml(msg.replyTo.text || (msg.replyTo.fileType === 'video' ? '[동영상]' : '[사진]'));
+    replyQuoteHtml = `
+      <div class="reply-quote-box flex items-center justify-between gap-1" onclick="scrollToMessage('${msg.replyTo.id}')" title="원본 메시지로 이동">
+        <div class="truncate">
+          <span class="font-bold mr-1">${replySender}</span>
+          <span class="opacity-80">${replySnippet}</span>
+        </div>
+        <i class="fa-solid fa-arrow-turn-up text-[10px] opacity-60 shrink-0"></i>
       </div>
     `;
+  }
+
+  // 액션 버튼: 내 메시지는 [답장, 복사, 수정, 삭제], 상대방 메시지는 [답장, 복사]
+  let actionsHtml = '';
+  if (!msg.isDeleted) {
+    if (isMy) {
+      actionsHtml = `
+        <div class="message-actions">
+          <button class="message-action-btn reply-btn" onclick="startReplyMessage('${msg.id}')"><i class="fa-solid fa-reply"></i> 답장</button>
+          <button class="message-action-btn copy-btn" onclick="copyMessageText('${msg.id}')"><i class="fa-regular fa-copy"></i> 복사</button>
+          ${!msg.fileUrl ? `<button class="message-action-btn edit-btn" onclick="startEditMessage('${msg.id}', '${encodeURIComponent(msg.text)}')"><i class="fa-solid fa-pen"></i> 수정</button>` : ''}
+          <button class="message-action-btn delete-btn" onclick="deleteMessage('${msg.id}')">
+            <i class="fa-solid fa-trash-can"></i> 삭제
+          </button>
+        </div>
+      `;
+    } else {
+      actionsHtml = `
+        <div class="message-actions">
+          <button class="message-action-btn reply-btn" onclick="startReplyMessage('${msg.id}')"><i class="fa-solid fa-reply"></i> 답장</button>
+          <button class="message-action-btn copy-btn" onclick="copyMessageText('${msg.id}')"><i class="fa-regular fa-copy"></i> 복사</button>
+        </div>
+      `;
+    }
   }
 
   let bubbleContent = '';
@@ -1175,23 +1596,34 @@ function appendMessage(msg, scroll = true) {
     bubbleContent = `<span class="deleted-message px-3 py-1.5 rounded-lg inline-block text-xs"><i class="fa-solid fa-ban mr-1"></i>삭제된 메시지입니다.</span>`;
   } else {
     let mediaHtml = '';
+    const isVideo = msg.type === 'video' || msg.fileType === 'video' || (msg.fileUrl && /\.(mp4|webm|mov|m4v)$/i.test(msg.fileUrl));
+
     if (msg.fileUrl) {
-      mediaHtml = `
-        <div class="mb-1 cursor-pointer group relative overflow-hidden rounded-xl bg-slate-900/10" onclick="openLightbox('${getFullUrl(msg.fileUrl)}', '${escapeHtml(msg.fileName || '')}')">
-          <img src="${getFullUrl(msg.fileUrl)}" alt="전송된 사진" loading="lazy" class="max-w-xs sm:max-w-sm max-h-72 object-cover rounded-xl transition duration-200 group-hover:scale-105">
-          <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-semibold gap-1">
-            <i class="fa-solid fa-magnifying-glass-plus"></i> 크게 보기
+      if (isVideo) {
+        mediaHtml = `
+          <div class="mb-1 overflow-hidden rounded-xl bg-black">
+            <video src="${getFullUrl(msg.fileUrl)}" controls playsinline preload="metadata" class="max-w-xs sm:max-w-sm max-h-72 rounded-xl w-full block"></video>
           </div>
-        </div>
-      `;
+        `;
+      } else {
+        mediaHtml = `
+          <div class="mb-1 cursor-pointer group relative overflow-hidden rounded-xl bg-slate-900/10" onclick="openLightbox('${getFullUrl(msg.fileUrl)}', '${escapeHtml(msg.fileName || '')}')">
+            <img src="${getFullUrl(msg.fileUrl)}" alt="전송된 사진" loading="lazy" class="max-w-xs sm:max-w-sm max-h-72 object-cover rounded-xl transition duration-200 group-hover:scale-105">
+            <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-semibold gap-1">
+              <i class="fa-solid fa-magnifying-glass-plus"></i> 크게 보기
+            </div>
+          </div>
+        `;
+      }
     }
 
     const textHtml = msg.text
-      ? `<div class="leading-relaxed text-sm break-words">${escapeHtml(msg.text)}${editedTagHtml}</div>`
+      ? `<div class="leading-relaxed text-sm break-words">${formatMessageText(msg.text)}${editedTagHtml}</div>`
       : '';
 
     bubbleContent = `
       <div class="message-bubble ${isMy ? 'bg-blue-600 text-white' : 'bg-white text-slate-800'}">
+        ${replyQuoteHtml}
         ${mediaHtml}
         ${textHtml}
       </div>
@@ -1210,10 +1642,10 @@ function appendMessage(msg, scroll = true) {
       ${bubbleContent}
     `;
 
-    // 모바일 터치 시 수정/삭제 메뉴 토글
+    // 모바일 터치 시 액션 메뉴 토글
     if (!msg.isDeleted) {
       row.addEventListener('click', (e) => {
-        if (e.target.closest('.message-actions')) return;
+        if (e.target.closest('.message-actions') || e.target.closest('.reply-quote-box') || e.target.closest('video')) return;
         row.classList.toggle('active');
       });
     }
@@ -1236,7 +1668,16 @@ function appendMessage(msg, scroll = true) {
           </div>
         </div>
       </div>
+      ${actionsHtml}
     `;
+
+    // 모바일 터치 시 액션 메뉴 토글 (답장/복사)
+    if (!msg.isDeleted) {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.message-actions') || e.target.closest('.reply-quote-box') || e.target.closest('video')) return;
+        row.classList.toggle('active');
+      });
+    }
   }
 
   messagesContainer.appendChild(row);
@@ -1245,6 +1686,11 @@ function appendMessage(msg, scroll = true) {
   if (imgEl && !imgEl.complete) {
     imgEl.addEventListener('load', () => scrollToBottom(false), { once: true });
     imgEl.addEventListener('error', () => scrollToBottom(false), { once: true });
+  }
+
+  const vidEl = row.querySelector('video');
+  if (vidEl) {
+    vidEl.addEventListener('loadedmetadata', () => scrollToBottom(false), { once: true });
   }
 
   if (scroll) scrollToBottom();
@@ -1282,13 +1728,13 @@ function scrollToBottom(smooth = false) {
   setTimeout(doScroll, 500);
 }
 
-// ==================== 4. 메시지 및 사진 전송 ====================
+// ==================== 4. 메시지 및 사진/동영상 전송 ====================
 
 messageForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const text = messageInput.value.trim();
+  let text = messageInput.value.trim();
 
-  if (!text && !selectedImageFile) return;
+  if (!text && !selectedMediaFile) return;
 
   if (editingMessageId) {
     socket.emit('edit_message', {
@@ -1306,12 +1752,13 @@ messageForm.addEventListener('submit', async (e) => {
     let fileUrl = null;
     let fileName = null;
     let fileSize = null;
+    let fileType = null;
 
-    if (selectedImageFile) {
+    if (selectedMediaFile) {
       btnSendText.textContent = '업로드 중...';
       try {
         const formData = new FormData();
-        formData.append('image', selectedImageFile);
+        formData.append('image', selectedMediaFile);
 
         const uploadRes = await fetch(getFullUrl('/api/upload'), {
           method: 'POST',
@@ -1323,20 +1770,36 @@ messageForm.addEventListener('submit', async (e) => {
           fileUrl = uploadData.fileUrl;
           fileName = uploadData.fileName;
           fileSize = uploadData.fileSize;
+          fileType = uploadData.fileType || selectedMediaType;
         } else {
-          alert('사진 업로드 실패: ' + uploadData.message);
+          alert('파일 업로드 실패: ' + uploadData.message);
           btnSendText.textContent = '전송';
           return;
         }
       } catch (err) {
         console.error('업로드 에러:', err);
-        alert('사진 파일 저장 중 오류가 발생했습니다.');
+        alert('파일 저장 중 오류가 발생했습니다.');
         btnSendText.textContent = '전송';
         return;
       }
     }
 
-    const isSilent = toggleSilentSend.checked;
+    // /silent, /slient, /무음, /조용히 명령어 체크
+    let isSilent = toggleSilentSend.checked;
+    const silentMatch = text.match(/^\/(?:silent|slient|무음|조용히)\s*(.*)/i);
+    if (silentMatch) {
+      isSilent = true;
+      text = silentMatch[1].trim();
+    }
+
+    const replyPayload = replyingToMessage ? {
+      id: replyingToMessage.id,
+      senderName: replyingToMessage.senderName,
+      senderDisplayName: replyingToMessage.senderDisplayName || replyingToMessage.senderName,
+      text: replyingToMessage.text || '',
+      fileUrl: replyingToMessage.fileUrl || null,
+      fileType: replyingToMessage.fileType || null
+    } : null;
 
     socket.emit('send_message', {
       roomId: currentRoomId,
@@ -1344,12 +1807,15 @@ messageForm.addEventListener('submit', async (e) => {
       isSilent,
       fileUrl,
       fileName,
-      fileSize
+      fileSize,
+      fileType,
+      replyTo: replyPayload
     }, (res) => {
       btnSendText.textContent = '전송';
       if (res.success) {
         messageInput.value = '';
-        clearSelectedImage();
+        clearSelectedMedia();
+        cancelReplyMode();
         if (window.innerWidth >= 768 && document.activeElement !== messageInput) {
           messageInput.focus();
         }

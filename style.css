@@ -293,6 +293,67 @@ body {
   opacity: 1;
 }
 
+/* 취소선, 굵게, 기울임 마크다운 스타일 */
+del.chat-strike {
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+/* 답장 인용 박스 */
+.reply-quote-box {
+  border-left: 3px solid #3b82f6;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+
+.my-message .reply-quote-box {
+  border-left-color: #93c5fd;
+  background: rgba(255, 255, 255, 0.15);
+  color: #eff6ff;
+}
+
+.reply-quote-box:hover {
+  opacity: 0.85;
+}
+
+/* 메시지 강조 깜빡임 애니메이션 (답장 원본 이동 시) */
+@keyframes highlightMsg {
+  0% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.02); filter: brightness(1.25); box-shadow: 0 0 0 3px #3b82f6; }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+.highlight-message {
+  animation: highlightMsg 1.2s ease-in-out;
+  border-radius: 1rem;
+}
+
+/* 그리기 색상 버튼 */
+.draw-color-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.draw-color-dot:hover {
+  transform: scale(1.15);
+}
+
+.draw-color-dot.active {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 2.5px #ffffff;
+  border-color: #ffffff;
+}
+
 
 /* 이모티콘 피커 */
 #emoji-picker-panel {
@@ -351,4 +412,65 @@ body {
 .emoji-cat-btn.active {
   background: #eff6ff;
   opacity: 1;
+}
+
+/* 취소선, 굵게, 기울임 마크다운 스타일 */
+del.chat-strike {
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+/* 답장 인용 박스 */
+.reply-quote-box {
+  border-left: 3px solid #3b82f6;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 4px 8px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+
+.my-message .reply-quote-box {
+  border-left-color: #93c5fd;
+  background: rgba(255, 255, 255, 0.15);
+  color: #eff6ff;
+}
+
+.reply-quote-box:hover {
+  opacity: 0.85;
+}
+
+/* 메시지 강조 깜빡임 애니메이션 (답장 원본 이동 시) */
+@keyframes highlightMsg {
+  0% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.02); filter: brightness(1.25); box-shadow: 0 0 0 3px #3b82f6; }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+.highlight-message {
+  animation: highlightMsg 1.2s ease-in-out;
+  border-radius: 1rem;
+}
+
+/* 그리기 색상 버튼 */
+.draw-color-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.draw-color-dot:hover {
+  transform: scale(1.15);
+}
+
+.draw-color-dot.active {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 2.5px #ffffff;
+  border-color: #ffffff;
 }
