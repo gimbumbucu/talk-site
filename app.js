@@ -796,6 +796,13 @@ window.addEventListener('DOMContentLoaded', () => {
   profileAvatarInput.addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // 사진 선택 즉시 0초 만에 브라우저 로컬 미리보기 표시 (절대 물음표 안 뜸!)
+    const localBlobUrl = URL.createObjectURL(file);
+    profileModalAvatarImg.src = localBlobUrl;
+    profileModalAvatarImg.classList.remove('hidden');
+    profileModalAvatarChar.classList.add('hidden');
+
     const formData = new FormData();
     formData.append('image', file);
     try {
@@ -805,13 +812,16 @@ window.addEventListener('DOMContentLoaded', () => {
       btnSaveProfile.textContent = '저장';
       if (data.success) {
         tempProfileAvatarUrl = data.fileUrl;
-        updateProfileModalPreview(tempProfileAvatarUrl, inputDisplayName.value);
+        profileModalAvatarImg.src = getFullUrl(tempProfileAvatarUrl);
       } else {
         alert('사진 업로드 실패: ' + data.message);
+        updateProfileModalPreview(tempProfileAvatarUrl, inputDisplayName.value);
       }
     } catch (err) {
       btnSaveProfile.textContent = '저장';
+      console.error('프로필 사진 업로드 에러:', err);
       alert('사진 업로드 중 오류가 발생했습니다.');
+      updateProfileModalPreview(tempProfileAvatarUrl, inputDisplayName.value);
     }
     profileAvatarInput.value = '';
   });
@@ -1581,43 +1591,56 @@ function getAvatarElement(avatarUrl, name, sizeClasses = 'w-8 h-8 text-xs') {
 
 function updateMyHeaderProfile() {
   if (!currentUser) return;
-  const name = currentUser.displayName || currentUser.username;
+  const name = currentUser.displayName || currentUser.username || '';
   myUsername.textContent = name;
   if (myStatusText) {
     myStatusText.textContent = currentUser.statusMessage || '';
   }
 
   if (currentUser.avatarUrl) {
-    if (currentUser.avatarUrl.startsWith('/') || currentUser.avatarUrl.startsWith('http')) {
-      myAvatarImg.src = currentUser.avatarUrl;
+    const isImg = currentUser.avatarUrl.startsWith('/') || currentUser.avatarUrl.startsWith('http') || currentUser.avatarUrl.startsWith('blob:') || currentUser.avatarUrl.startsWith('data:');
+    if (isImg) {
+      myAvatarImg.src = getFullUrl(currentUser.avatarUrl);
       myAvatarImg.classList.remove('hidden');
       myAvatarChar.classList.add('hidden');
+      myAvatarImg.onerror = () => {
+        myAvatarImg.classList.add('hidden');
+        myAvatarChar.classList.remove('hidden');
+        myAvatarChar.textContent = name ? name.charAt(0).toUpperCase() : '?';
+      };
     } else {
       myAvatarChar.textContent = currentUser.avatarUrl;
       myAvatarChar.classList.remove('hidden');
       myAvatarImg.classList.add('hidden');
     }
   } else {
-    myAvatarChar.textContent = name.charAt(0).toUpperCase();
+    myAvatarChar.textContent = name ? name.charAt(0).toUpperCase() : '?';
     myAvatarChar.classList.remove('hidden');
     myAvatarImg.classList.add('hidden');
   }
 }
 
 function updateProfileModalPreview(avatarUrl, name) {
-  const isImage = avatarUrl && (avatarUrl.startsWith('/') || avatarUrl.startsWith('http'));
+  const isImage = avatarUrl && (avatarUrl.startsWith('/') || avatarUrl.startsWith('http') || avatarUrl.startsWith('blob:') || avatarUrl.startsWith('data:'));
   const isEmoji = avatarUrl && !isImage;
 
   if (isImage) {
-    profileModalAvatarImg.src = avatarUrl;
+    profileModalAvatarImg.src = getFullUrl(avatarUrl);
     profileModalAvatarImg.classList.remove('hidden');
     profileModalAvatarChar.classList.add('hidden');
+    profileModalAvatarImg.onerror = () => {
+      profileModalAvatarImg.classList.add('hidden');
+      profileModalAvatarChar.classList.remove('hidden');
+      const disp = (name || currentUser?.displayName || currentUser?.username || '').trim();
+      profileModalAvatarChar.textContent = disp ? disp.charAt(0).toUpperCase() : '?';
+    };
   } else if (isEmoji) {
     profileModalAvatarChar.textContent = avatarUrl;
     profileModalAvatarChar.classList.remove('hidden');
     profileModalAvatarImg.classList.add('hidden');
   } else {
-    profileModalAvatarChar.textContent = (name || '?').charAt(0).toUpperCase();
+    const disp = (name || currentUser?.displayName || currentUser?.username || '').trim();
+    profileModalAvatarChar.textContent = disp ? disp.charAt(0).toUpperCase() : '?';
     profileModalAvatarChar.classList.remove('hidden');
     profileModalAvatarImg.classList.add('hidden');
   }
