@@ -1859,7 +1859,9 @@ function startDirectMessage(targetUsername) {
   });
 }
 
-// ==================== 3. 메시지 렌더링 & 시간 포맷 ====================
+// ==================== 3. 메시지 렌더링 & 시간/날짜 포맷 ====================
+
+let lastRenderedDateKey = null; // 현재 채팅방에 렌더링된 마지막 메시지 날짜 키 (YYYY-MM-DD)
 
 function formatShortTime(isoString) {
   if (!isoString) return '';
@@ -1872,9 +1874,51 @@ function formatShortTime(isoString) {
   return `${ampm} ${hours}:${minutes}`;
 }
 
+// 카카오톡 스타일 날짜 포맷 (예: 2026년 11월 13일 금요일)
+function formatDateBadge(isoString) {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return '';
+
+  const daysOfWeek = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const dayName = daysOfWeek[date.getDay()];
+
+  return `${year}년 ${month}월 ${day}일 ${dayName}`;
+}
+
+// 로컬 시간 기준 날짜 비교 키 (YYYY-MM-DD)
+function getDateKey(isoString) {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return '';
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// 카카오톡 스타일 날짜 구분선 DOM 요소 생성 (가운데 배치)
+function createDateDivider(dateStr) {
+  const container = document.createElement('div');
+  container.className = 'date-divider-container';
+  container.innerHTML = `
+    <div class="date-divider-line"></div>
+    <div class="date-divider-pill">
+      <i class="fa-regular fa-calendar text-[11px] opacity-70"></i>
+      <span>${escapeHtml(dateStr)}</span>
+    </div>
+    <div class="date-divider-line"></div>
+  `;
+  return container;
+}
+
 function renderMessages(messages) {
   messagesContainer.innerHTML = '';
   allMessagesMap.clear();
+  lastRenderedDateKey = null; // 방을 열거나 새로고침 시 날짜 키 초기화
   if (!messages || messages.length === 0) {
     return;
   }
@@ -1898,6 +1942,19 @@ function renderMessages(messages) {
 }
 
 function appendMessage(msg, scroll = true) {
+  // 카카오톡 스타일: 하루가 지나 대화가 시작되거나 날짜가 바뀌면 한가운데 날짜 구분선 표시
+  if (msg.timestamp) {
+    const msgDateKey = getDateKey(msg.timestamp);
+    if (msgDateKey && msgDateKey !== lastRenderedDateKey) {
+      lastRenderedDateKey = msgDateKey;
+      const dateBadgeText = formatDateBadge(msg.timestamp);
+      if (dateBadgeText) {
+        const dividerEl = createDateDivider(dateBadgeText);
+        messagesContainer.appendChild(dividerEl);
+      }
+    }
+  }
+
   if (msg.isSystem) {
     const sysEl = document.createElement('div');
     sysEl.className = 'system-message';
